@@ -84,8 +84,8 @@ export default function EmployeeHome() {
   if (loading) return <PageSkeleton />
 
   return (
-    <div className="space-y-5">
-      <div>
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+      <div className="lg:col-span-2">
         <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">
           {greeting()}, {employee?.name?.split(' ')[0]} <span className="text-gold-500">✦</span>
         </h1>
@@ -93,7 +93,7 @@ export default function EmployeeHome() {
       </div>
 
       {unreadCount > 0 && (
-        <Link to="/announcements" className="block">
+        <Link to="/announcements" className="block lg:col-span-2">
           <Banner tone="info">
             {unreadCount} unread notice{unreadCount > 1 ? 's' : ''} — tap to read
           </Banner>
@@ -140,7 +140,7 @@ export default function EmployeeHome() {
         )}
       </Card>
 
-      <Card>
+      <Card className="lg:col-span-2">
         <SectionLabel>Today's to-do</SectionLabel>
         <form onSubmit={quickAddTask} className="mb-3 flex gap-2">
           <Input placeholder="Quick add a task" value={newTask} onChange={(e) => setNewTask(e.target.value)} className="!py-2" />

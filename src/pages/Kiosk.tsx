@@ -106,8 +106,8 @@ export default function Kiosk() {
       {view.name === 'roster' && (
         <>
           <div className="mb-8 text-center">
-            <p className="font-display text-2xl text-ink dark:text-ivory-dark-text">{format(clock, 'EEEE, d MMMM')}</p>
-            <p className="mt-1 text-lg tabular-nums text-ink-soft">
+            <p className="font-display text-2xl text-ink md:text-3xl dark:text-ivory-dark-text">{format(clock, 'EEEE, d MMMM')}</p>
+            <p className="mt-1 text-lg tabular-nums text-ink-soft md:text-xl">
               {format(clock, 'h:mm')}
               <span className="text-gold-500">{format(clock, ':ss')}</span>
               <span className="ml-1 text-sm">{format(clock, 'a')}</span>
@@ -132,7 +132,7 @@ export default function Kiosk() {
                       : 'border-hairline bg-white hover:border-gold-400 dark:border-hairline-dark dark:bg-espresso-2'
                   }`}
                 >
-                  <p className="font-display text-lg text-ink dark:text-ivory-dark-text">{emp.name.split(' ')[0]}</p>
+                  <p className="font-display text-lg text-ink md:text-xl dark:text-ivory-dark-text">{emp.name.split(' ')[0]}</p>
                   <p className={`mt-1 text-xs ${emp.checked_in ? 'text-gold-600' : 'text-ink-soft'}`}>
                     {emp.completed
                       ? `Done · ${format(new Date(emp.check_in_time!), 'h:mm a')} – ${format(new Date(emp.check_out_time!), 'h:mm a')}`
@@ -175,8 +175,8 @@ export default function Kiosk() {
 
 function KioskFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10">
-      <div className="page-enter flex flex-1 flex-col">{children}</div>
+    <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10 md:max-w-xl md:justify-center md:py-16">
+      <div className="page-enter flex flex-1 flex-col md:flex-none">{children}</div>
       <p className="label-caps mt-10 text-center">Kaha ✦ Staff Attendance</p>
     </div>
   )

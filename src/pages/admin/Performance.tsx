@@ -37,10 +37,10 @@ export default function AdminPerformance() {
   const isCurrentMonth = format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
   return (
-    <div className="space-y-5">
-      <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">Performance</h1>
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+      <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text lg:col-span-2">Performance</h1>
 
-      <div className="flex items-center justify-between rounded-[14px] border border-hairline bg-white px-4 py-2.5 dark:border-hairline-dark dark:bg-espresso-2">
+      <div className="flex items-center justify-between rounded-[14px] border border-hairline bg-white px-4 py-2.5 lg:col-span-2 dark:border-hairline-dark dark:bg-espresso-2">
         <button onClick={() => setMonth(subMonths(month, 1))} className="p-1 text-ink-soft hover:text-ink dark:hover:text-ivory-dark-text">
           <ChevronLeft size={18} strokeWidth={1.5} />
         </button>
@@ -55,9 +55,9 @@ export default function AdminPerformance() {
       </div>
 
       {loading ? (
-        <PageSkeleton />
+        <div className="lg:col-span-2"><PageSkeleton /></div>
       ) : employees.length === 0 ? (
-        <Card><EmptyState>No employees yet.</EmptyState></Card>
+        <Card className="lg:col-span-2"><EmptyState>No employees yet.</EmptyState></Card>
       ) : (
         employees.map((emp) => {
           const rows = attendance.filter((a) => a.employee_id === emp.id)

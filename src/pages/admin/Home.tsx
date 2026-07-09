@@ -55,8 +55,8 @@ export default function AdminHome() {
   if (loading) return <PageSkeleton />
 
   return (
-    <div className="space-y-5">
-      <div>
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+      <div className="lg:col-span-2">
         <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">Today</h1>
         <p className="mt-0.5 text-sm text-ink-soft">{format(new Date(), 'EEEE, d MMMM')}</p>
       </div>
@@ -187,7 +187,7 @@ export default function AdminHome() {
         </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:col-span-2 lg:grid-cols-4">
         <QuickLink to="/admin/attendance" icon={<MapPin size={16} strokeWidth={1.5} />} label="Attendance" />
         <QuickLink to="/admin/leave" icon={<CalendarDays size={16} strokeWidth={1.5} />} label="Leave" />
         <QuickLink to="/admin/team" icon={<Users size={16} strokeWidth={1.5} />} label="Team" />
