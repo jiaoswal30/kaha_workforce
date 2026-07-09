@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Button, Banner } from '../components/ui'
+import { Button, Banner, Input, FieldLabel, Monogram } from '../components/ui'
 
 export default function Login() {
   const { session, loading, signIn } = useAuth()
@@ -10,7 +10,8 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  if (!loading && session) return <Navigate to="/" replace />
+  if (loading) return <Monogram />
+  if (session) return <Navigate to="/" replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -22,40 +23,34 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4 dark:bg-stone-900">
+    <div className="page-enter flex min-h-screen items-center justify-center px-5">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">Kaha</h1>
-          <p className="mt-1 text-sm text-stone-500">Staff Manager</p>
+        <div className="mb-10 text-center">
+          <p className="font-display text-5xl text-ink dark:text-ivory-dark-text">Kaha</p>
+          <p className="label-caps mt-2">Staff</p>
+          <div className="mx-auto mt-3 h-px w-8 bg-gold-500" />
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-800 dark:bg-stone-800/40">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && <Banner tone="error">{error}</Banner>}
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700 dark:text-stone-300">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-accent-500 dark:border-stone-700 dark:bg-stone-900"
-              autoComplete="email"
-            />
+            <FieldLabel>Email</FieldLabel>
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700 dark:text-stone-300">Password</label>
-            <input
+            <FieldLabel>Password</FieldLabel>
+            <Input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-stone-300 px-3 py-2.5 outline-none focus:border-accent-500 dark:border-stone-700 dark:bg-stone-900"
               autoComplete="current-password"
             />
           </div>
-          <Button type="submit" disabled={submitting} className="w-full">
-            {submitting ? 'Signing in…' : 'Sign in'}
+          <Button type="submit" busy={submitting} className="w-full py-3">
+            Sign in
           </Button>
         </form>
+        <p className="mt-8 text-center text-xs text-ink-soft">Kaha ✦ Bengaluru</p>
       </div>
     </div>
   )

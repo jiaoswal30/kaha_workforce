@@ -1,79 +1,136 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import {
+  Home, CalendarDays, CheckSquare, NotebookPen, MoreHorizontal,
+  MapPin, Users, Gem, Megaphone, MessageCircleWarning, BarChart3, ClipboardList, LogOut, X,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
-const EMPLOYEE_NAV = [
-  { to: '/', label: 'Home', icon: '🏠' },
-  { to: '/leave', label: 'Leave', icon: '📅' },
-  { to: '/tasks', label: 'Tasks', icon: '✅' },
-  { to: '/log', label: 'Log', icon: '📝' },
-  { to: '/notes', label: 'Notes', icon: '💎' },
+type NavItem = { to: string; label: string; icon: typeof Home }
+
+const EMPLOYEE_NAV: NavItem[] = [
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/leave', label: 'Leave', icon: CalendarDays },
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/log', label: 'Log', icon: NotebookPen },
 ]
 
-const ADMIN_NAV = [
-  { to: '/', label: 'Home', icon: '🏠' },
-  { to: '/admin/attendance', label: 'Attendance', icon: '📍' },
-  { to: '/admin/leave', label: 'Leave', icon: '📅' },
-  { to: '/admin/tasks', label: 'Tasks', icon: '✅' },
-  { to: '/admin/logs', label: 'Logs', icon: '📝' },
+const EMPLOYEE_MORE: NavItem[] = [
+  { to: '/concerns', label: 'Concerns', icon: MessageCircleWarning },
+  { to: '/notes', label: 'Inventory notes', icon: Gem },
+  { to: '/announcements', label: 'Notices', icon: Megaphone },
+]
+
+const ADMIN_NAV: NavItem[] = [
+  { to: '/', label: 'Today', icon: Home },
+  { to: '/admin/attendance', label: 'Attendance', icon: MapPin },
+  { to: '/admin/leave', label: 'Leave', icon: CalendarDays },
+  { to: '/admin/team', label: 'Team', icon: Users },
+]
+
+const ADMIN_MORE: NavItem[] = [
+  { to: '/admin/tasks', label: 'Tasks & goals', icon: ClipboardList },
+  { to: '/admin/logs', label: 'Daily logs', icon: NotebookPen },
+  { to: '/admin/concerns', label: 'Concerns', icon: MessageCircleWarning },
+  { to: '/admin/performance', label: 'Performance', icon: BarChart3 },
+  { to: '/notes', label: 'Inventory notes', icon: Gem },
+  { to: '/announcements', label: 'Announcements', icon: Megaphone },
 ]
 
 export default function AppShell() {
   const { employee, signOut } = useAuth()
-  const nav = employee?.role === 'admin' ? ADMIN_NAV : EMPLOYEE_NAV
+  const [moreOpen, setMoreOpen] = useState(false)
+  const location = useLocation()
+  const isAdmin = employee?.role === 'admin'
+  const nav = isAdmin ? ADMIN_NAV : EMPLOYEE_NAV
+  const more = isAdmin ? ADMIN_MORE : EMPLOYEE_MORE
+  const moreActive = more.some((m) => m.to === location.pathname)
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col bg-stone-50 dark:bg-stone-900">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-200 bg-stone-50/90 px-4 py-3 backdrop-blur dark:border-stone-800 dark:bg-stone-900/90">
-        <div>
-          <p className="font-semibold text-stone-900 dark:text-stone-50">Kaha</p>
-          <p className="text-xs text-stone-500">{employee?.name}</p>
+    <div className="mx-auto flex min-h-screen max-w-md flex-col">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-ivory/90 px-5 py-3 backdrop-blur dark:border-hairline-dark dark:bg-espresso/90">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-xl text-ink dark:text-ivory-dark-text">Kaha</span>
+          <span className="label-caps">Staff</span>
         </div>
-        <div className="flex items-center gap-2">
-          {employee?.role === 'admin' && (
-            <NavLink to="/announcements" className="text-xs text-accent-600 underline">
-              Announcements
-            </NavLink>
-          )}
-          <button onClick={signOut} className="text-xs font-medium text-stone-500 hover:text-stone-800 dark:hover:text-stone-200">
-            Sign out
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-ink-soft">{employee?.name?.split(' ')[0]}</span>
+          <button
+            onClick={signOut}
+            aria-label="Sign out"
+            className="text-ink-soft transition-colors hover:text-ink dark:hover:text-ivory-dark-text"
+          >
+            <LogOut size={16} strokeWidth={1.5} />
           </button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
+      <main key={location.pathname} className="page-enter flex-1 px-5 pb-28 pt-5">
         <Outlet />
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-lg border-t border-stone-200 bg-white/95 backdrop-blur dark:border-stone-800 dark:bg-stone-800/95">
-        <div className="flex justify-around">
+      {moreOpen && (
+        <div className="fixed inset-0 z-20" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0 bg-ink/25" />
+          <div
+            className="page-enter absolute inset-x-0 bottom-0 mx-auto max-w-md rounded-t-2xl border-t border-hairline bg-white p-5 pb-8 dark:border-hairline-dark dark:bg-espresso-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <p className="label-caps">More</p>
+              <button onClick={() => setMoreOpen(false)} aria-label="Close" className="text-ink-soft">
+                <X size={18} strokeWidth={1.5} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {more.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMoreOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-sm ${
+                      isActive
+                        ? 'border-gold-400 text-gold-600'
+                        : 'border-hairline text-ink hover:border-gold-400/50 dark:border-hairline-dark dark:text-ivory-dark-text'
+                    }`
+                  }
+                >
+                  <item.icon size={18} strokeWidth={1.5} />
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-md border-t border-hairline bg-white/95 backdrop-blur dark:border-hairline-dark dark:bg-espresso-2/95">
+        <div className="flex justify-around pb-[env(safe-area-inset-bottom)]">
           {nav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${
-                  isActive ? 'text-accent-600' : 'text-stone-500'
+                `flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium tracking-wide ${
+                  isActive ? 'text-gold-600' : 'text-ink-soft'
                 }`
               }
             >
-              <span className="text-lg leading-none">{item.icon}</span>
+              <item.icon size={18} strokeWidth={1.5} />
               {item.label}
             </NavLink>
           ))}
-          {employee?.role === 'employee' && (
-            <NavLink
-              to="/announcements"
-              className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${
-                  isActive ? 'text-accent-600' : 'text-stone-500'
-                }`
-              }
-            >
-              <span className="text-lg leading-none">📣</span>
-              Notices
-            </NavLink>
-          )}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium tracking-wide ${
+              moreActive ? 'text-gold-600' : 'text-ink-soft'
+            }`}
+          >
+            <MoreHorizontal size={18} strokeWidth={1.5} />
+            More
+          </button>
         </div>
       </nav>
     </div>

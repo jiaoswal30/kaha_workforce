@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { todayISO, currentWeekStartISO } from '../../lib/dates'
-import { Card, Button, EmptyState } from '../../components/ui'
+import { Card, SectionLabel, Button, Input, Select, Chip, EmptyState, PageSkeleton } from '../../components/ui'
 import type { Employee, Todo, WeeklyGoal } from '../../types/database'
 
 export default function AdminTasks() {
@@ -44,60 +44,60 @@ export default function AdminTasks() {
     await load()
   }
 
-  if (loading) return <p className="text-stone-500">Loading…</p>
+  if (loading) return <PageSkeleton />
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Employee Performance</h1>
+    <div className="space-y-5">
+      <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">Tasks & Goals</h1>
 
       <Card>
-        <p className="mb-2 text-sm font-medium text-stone-700 dark:text-stone-300">Assign a task</p>
-        <form onSubmit={addTask} className="flex flex-col gap-2 sm:flex-row">
-          <select
-            value={newTaskEmp}
-            onChange={(e) => setNewTaskEmp(e.target.value)}
-            className="rounded-xl border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900"
-          >
+        <SectionLabel>Assign a task</SectionLabel>
+        <form onSubmit={addTask} className="space-y-2">
+          <Select value={newTaskEmp} onChange={(e) => setNewTaskEmp(e.target.value)}>
             {employees.map((e) => (
               <option key={e.id} value={e.id}>{e.name}</option>
             ))}
-          </select>
-          <input
-            placeholder="Task title"
-            value={newTaskTitle}
-            onChange={(e) => setNewTaskTitle(e.target.value)}
-            className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none dark:border-stone-700 dark:bg-stone-900"
-          />
-          <Button type="submit" className="px-3 py-2 text-sm">Add</Button>
+          </Select>
+          <div className="flex gap-2">
+            <Input placeholder="Task title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="!py-2" />
+            <Button type="submit" className="!py-2 text-xs">Add</Button>
+          </div>
         </form>
       </Card>
 
       <Card>
-        <p className="mb-2 text-sm font-medium text-stone-700 dark:text-stone-300">Today's tasks — all employees</p>
+        <SectionLabel>Today's tasks</SectionLabel>
         {employees.map((emp) => {
           const empTodos = todos.filter((t) => t.employee_id === emp.id)
           const done = empTodos.filter((t) => t.status === 'done').length
           return (
-            <div key={emp.id} className="mb-3 border-b border-stone-100 pb-3 last:border-0 dark:border-stone-800">
-              <p className="mb-1 text-sm font-medium text-stone-900 dark:text-stone-50">
-                {emp.name} <span className="text-xs font-normal text-stone-500">({done}/{empTodos.length || 0} done)</span>
+            <div key={emp.id} className="mb-4 border-b border-hairline pb-4 last:mb-0 last:border-0 last:pb-0 dark:border-hairline-dark">
+              <p className="mb-2 flex items-center justify-between text-sm font-medium text-ink dark:text-ivory-dark-text">
+                {emp.name}
+                <span className="text-xs font-normal text-ink-soft">{done}/{empTodos.length} done</span>
               </p>
-              {empTodos.length === 0 && <p className="text-xs text-stone-500">No tasks today.</p>}
-              <ul className="space-y-1.5">
+              {empTodos.length === 0 && <p className="text-xs text-ink-soft">No tasks today.</p>}
+              <ul className="space-y-2">
                 {empTodos.map((t) => (
-                  <li key={t.id} className="rounded-lg bg-stone-50 p-2 text-sm dark:bg-stone-900">
-                    <div className="flex items-center justify-between">
-                      <span className={t.status === 'done' ? 'text-stone-400 line-through' : ''}>{t.title}</span>
-                      <span className="text-xs text-stone-500">{t.status}</span>
+                  <li key={t.id} className="rounded-xl border border-hairline p-2.5 dark:border-hairline-dark">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-sm ${t.status === 'done' ? 'text-ink-soft line-through' : 'text-ink dark:text-ivory-dark-text'}`}>
+                        {t.title}
+                      </span>
+                      <Chip tone={t.status === 'done' ? 'sage' : t.status === 'in_progress' ? 'gold' : 'neutral'}>
+                        {t.status.replace('_', ' ')}
+                      </Chip>
                     </div>
-                    <div className="mt-1 flex gap-2">
-                      <input
+                    <div className="mt-1.5 flex gap-1.5">
+                      <Input
                         placeholder="Comment"
                         defaultValue={t.admin_comment ?? ''}
                         onChange={(e) => setCommentDraft((c) => ({ ...c, [t.id]: e.target.value }))}
-                        className="flex-1 rounded-lg border border-stone-300 px-2 py-1 text-xs dark:border-stone-700 dark:bg-stone-800"
+                        className="!px-2.5 !py-1 text-xs"
                       />
-                      <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => saveComment(t)}>Save</Button>
+                      <Button variant="secondary" className="!px-2.5 !py-1 text-xs" onClick={() => saveComment(t)}>
+                        Save
+                      </Button>
                     </div>
                   </li>
                 ))}
@@ -109,17 +109,19 @@ export default function AdminTasks() {
       </Card>
 
       <Card>
-        <p className="mb-2 text-sm font-medium text-stone-700 dark:text-stone-300">This week's goals</p>
-        {employees.map((emp) => {
-          const empGoals = goals.filter((g) => g.employee_id === emp.id)
-          const done = empGoals.filter((g) => g.is_completed).length
-          return (
-            <div key={emp.id} className="mb-2 flex items-center justify-between text-sm">
-              <span className="font-medium text-stone-900 dark:text-stone-50">{emp.name}</span>
-              <span className="text-stone-500">{done}/{empGoals.length} completed</span>
-            </div>
-          )
-        })}
+        <SectionLabel>This week's goals</SectionLabel>
+        <ul className="space-y-2">
+          {employees.map((emp) => {
+            const empGoals = goals.filter((g) => g.employee_id === emp.id)
+            const done = empGoals.filter((g) => g.is_completed).length
+            return (
+              <li key={emp.id} className="flex items-center justify-between text-sm">
+                <span className="text-ink dark:text-ivory-dark-text">{emp.name}</span>
+                <span className="text-xs text-ink-soft">{done}/{empGoals.length} completed</span>
+              </li>
+            )
+          })}
+        </ul>
       </Card>
     </div>
   )

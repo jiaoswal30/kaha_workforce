@@ -1,11 +1,31 @@
 import { useEffect, useState, useCallback, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { format, getDay, addDays } from 'date-fns'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
-import { getCurrentPosition } from '../../lib/geolocation'
-import { todayISO, formatTime } from '../../lib/dates'
-import { Card, Button, Banner, StatusBadge } from '../../components/ui'
-import type { Attendance, LeaveBalance, Todo } from '../../types/database'
+import { todayISO, formatTime, hoursWorked } from '../../lib/dates'
+import { Card, SectionLabel, Button, Banner, Chip, Input, PageSkeleton } from '../../components/ui'
+import type { Attendance, LeaveBalance, Todo, WeekdayName } from '../../types/database'
+
+const WEEKDAY_INDEX: WeekdayName[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function nextWeekOff(day: WeekdayName | null): string | null {
+  if (!day) return null
+  const target = WEEKDAY_INDEX.indexOf(day)
+  for (let i = 0; i < 8; i++) {
+    const d = addDays(new Date(), i)
+    if (getDay(d) === target && i > 0) return format(d, 'EEE, d MMM')
+    if (getDay(d) === target && i === 0) return 'today'
+  }
+  return null
+}
 
 export default function EmployeeHome() {
   const { employee } = useAuth()
@@ -15,8 +35,6 @@ export default function EmployeeHome() {
   const [newTask, setNewTask] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [working, setWorking] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!employee) return
@@ -43,36 +61,6 @@ export default function EmployeeHome() {
     load()
   }, [load])
 
-  async function handleCheckIn() {
-    setError(null)
-    setWorking(true)
-    try {
-      const { lat, lng } = await getCurrentPosition()
-      const { error } = await supabase.rpc('check_in', { p_lat: lat, p_lng: lng })
-      if (error) throw error
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.')
-    } finally {
-      setWorking(false)
-    }
-  }
-
-  async function handleCheckOut() {
-    setError(null)
-    setWorking(true)
-    try {
-      const { lat, lng } = await getCurrentPosition()
-      const { error } = await supabase.rpc('check_out', { p_lat: lat, p_lng: lng })
-      if (error) throw error
-      await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.')
-    } finally {
-      setWorking(false)
-    }
-  }
-
   async function quickAddTask(e: FormEvent) {
     e.preventDefault()
     if (!employee || !newTask.trim()) return
@@ -90,78 +78,90 @@ export default function EmployeeHome() {
     await load()
   }
 
-  const isCheckedIn = attendance?.check_in_time && !attendance?.check_out_time
   const available = balance ? balance.paid_leaves_entitled - balance.carried_deduction - balance.paid_leaves_used : null
+  const upcomingOff = nextWeekOff(employee?.weekly_off_day ?? null)
 
-  if (loading) return <p className="text-stone-500">Loading…</p>
+  if (loading) return <PageSkeleton />
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Hi, {employee?.name?.split(' ')[0]}</h1>
-
-      {error && <Banner tone="error">{error}</Banner>}
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">
+          {greeting()}, {employee?.name?.split(' ')[0]} <span className="text-gold-500">✦</span>
+        </h1>
+        <p className="mt-0.5 text-sm text-ink-soft">{format(new Date(), 'EEEE, d MMMM')}</p>
+      </div>
 
       {unreadCount > 0 && (
-        <Link to="/announcements">
+        <Link to="/announcements" className="block">
           <Banner tone="info">
-            📣 {unreadCount} unread announcement{unreadCount > 1 ? 's' : ''} — tap to view
+            {unreadCount} unread notice{unreadCount > 1 ? 's' : ''} — tap to read
           </Banner>
         </Link>
       )}
 
-      <Card className="text-center">
-        {isCheckedIn ? (
-          <>
-            <p className="text-sm text-stone-500">Checked in since</p>
-            <p className="mb-4 text-2xl font-semibold text-stone-900 dark:text-stone-50">{formatTime(attendance!.check_in_time)}</p>
-            <Button onClick={handleCheckOut} disabled={working} variant="danger" className="w-full py-4 text-lg">
-              {working ? 'Checking out…' : 'Check Out'}
-            </Button>
-          </>
+      <Card>
+        <SectionLabel>Today</SectionLabel>
+        {attendance?.check_in_time && !attendance.check_out_time ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-display text-2xl text-ink dark:text-ivory-dark-text">{formatTime(attendance.check_in_time)}</p>
+              <p className="mt-0.5 text-xs text-ink-soft">Checked in</p>
+            </div>
+            {attendance.is_half_day ? <Chip tone="bronze">Half day</Chip> : <Chip tone="sage">On shift</Chip>}
+          </div>
         ) : attendance?.check_out_time ? (
-          <>
-            <p className="text-sm text-stone-500">Shift complete</p>
-            <p className="mb-1 text-lg font-medium text-stone-900 dark:text-stone-50">
-              {formatTime(attendance.check_in_time)} → {formatTime(attendance.check_out_time)}
-            </p>
-            <div className="mt-2 flex justify-center"><StatusBadge status={attendance.status} /></div>
-          </>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-display text-2xl text-ink dark:text-ivory-dark-text">
+                {hoursWorked(attendance.check_in_time, attendance.check_out_time)}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-soft">
+                {formatTime(attendance.check_in_time)} – {formatTime(attendance.check_out_time)}
+              </p>
+            </div>
+            <Chip tone={attendance.is_half_day ? 'bronze' : 'sage'}>
+              {attendance.is_half_day ? 'Half day' : 'Shift complete'}
+            </Chip>
+          </div>
         ) : (
-          <>
-            <p className="mb-4 text-sm text-stone-500">You haven't checked in today</p>
-            <Button onClick={handleCheckIn} disabled={working} className="w-full py-4 text-lg">
-              {working ? 'Checking in…' : 'Check In'}
-            </Button>
-          </>
+          <p className="text-sm text-ink-soft">Not checked in — use the store computer to check in.</p>
         )}
       </Card>
 
       <Card>
-        <p className="text-sm text-stone-500">Paid leave this month</p>
-        <p className="text-lg font-medium text-stone-900 dark:text-stone-50">
-          You have <span className="text-accent-600">{Math.max(available ?? 0, 0)}</span> paid leave(s) remaining this month
-        </p>
+        <SectionLabel>Paid leave this month</SectionLabel>
+        <div className="flex items-end justify-between">
+          <p className="font-display text-4xl text-gold-600">{Math.max(available ?? 0, 0)}</p>
+          {upcomingOff && <p className="text-xs text-ink-soft">Next week off: {upcomingOff}</p>}
+        </div>
+        {balance && balance.carried_deduction > 0 && (
+          <p className="mt-2 text-xs text-bronze-500">Last month's 5th week off carried a deduction into this month.</p>
+        )}
       </Card>
 
       <Card>
-        <p className="mb-2 text-sm font-medium text-stone-700 dark:text-stone-300">Today's to-do</p>
-        <form onSubmit={quickAddTask} className="mb-2 flex gap-2">
-          <input
-            placeholder="Quick add a task"
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none dark:border-stone-700 dark:bg-stone-900"
-          />
-          <Button type="submit" className="px-3 py-2 text-sm">Add</Button>
+        <SectionLabel>Today's to-do</SectionLabel>
+        <form onSubmit={quickAddTask} className="mb-3 flex gap-2">
+          <Input placeholder="Quick add a task" value={newTask} onChange={(e) => setNewTask(e.target.value)} className="!py-2" />
+          <Button type="submit" className="!py-2 text-xs">Add</Button>
         </form>
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {todos.map((t) => (
-            <li key={t.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={t.status === 'done'} onChange={() => toggleTodo(t)} className="h-4 w-4 accent-accent-600" />
-              <span className={t.status === 'done' ? 'text-stone-400 line-through' : 'text-stone-900 dark:text-stone-50'}>{t.title}</span>
+            <li key={t.id} className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={t.status === 'done'}
+                onChange={() => toggleTodo(t)}
+                className="h-4 w-4 accent-gold-500"
+              />
+              <span className={`text-sm ${t.status === 'done' ? 'text-ink-soft line-through' : 'text-ink dark:text-ivory-dark-text'}`}>
+                {t.title}
+              </span>
+              {t.carried_from && <Chip tone="neutral">carried</Chip>}
             </li>
           ))}
-          {todos.length === 0 && <p className="text-sm text-stone-500">No tasks yet today.</p>}
+          {todos.length === 0 && <p className="text-sm text-ink-soft">Nothing planned yet — add your first task.</p>}
         </ul>
       </Card>
     </div>

@@ -1,13 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { formatDate } from '../../lib/dates'
-import { Card, EmptyState } from '../../components/ui'
+import { Card, Input, Select, EmptyState, PageSkeleton } from '../../components/ui'
 import type { DailyLog, Employee } from '../../types/database'
 
 export default function AdminLogs() {
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [logs, setLogs] = useState<DailyLog[]>([])
-  const [loading, setLoading] = useState(true)
+  const [logs, setLogs] = useState<DailyLog[] | null>(null)
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('')
 
@@ -18,7 +17,6 @@ export default function AdminLogs() {
     ])
     setEmployees(emps ?? [])
     setLogs(l ?? [])
-    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -29,52 +27,43 @@ export default function AdminLogs() {
     return employees.find((e) => e.id === id)?.name ?? 'Unknown'
   }
 
+  if (logs === null) return <PageSkeleton />
+
   const filtered = logs.filter((l) => {
     if (employeeFilter !== 'all' && l.employee_id !== employeeFilter) return false
     if (dateFilter && l.date !== dateFilter) return false
     return true
   })
 
-  if (loading) return <p className="text-stone-500">Loading…</p>
-
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Daily Logs</h1>
+    <div className="space-y-5">
+      <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">Daily Logs</h1>
 
       <Card>
         <div className="flex gap-2">
-          <select
-            value={employeeFilter}
-            onChange={(e) => setEmployeeFilter(e.target.value)}
-            className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900"
-          >
+          <Select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="!py-2 text-xs">
             <option value="all">All employees</option>
             {employees.map((e) => (
               <option key={e.id} value={e.id}>{e.name}</option>
             ))}
-          </select>
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="rounded-xl border border-stone-300 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900"
-          />
+          </Select>
+          <Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="!py-2 text-xs" />
         </div>
       </Card>
 
       <div className="space-y-3">
         {filtered.map((log) => (
           <Card key={log.id}>
-            <div className="mb-1 flex items-center justify-between">
-              <p className="font-medium text-stone-900 dark:text-stone-50">{employeeName(log.employee_id)}</p>
-              <p className="text-xs text-stone-500">{formatDate(log.date)}</p>
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-sm font-medium text-ink dark:text-ivory-dark-text">{employeeName(log.employee_id)}</p>
+              <p className="label-caps">{formatDate(log.date)}</p>
             </div>
             {log.customers_handled !== null && (
-              <p className="text-sm text-stone-600 dark:text-stone-300">Customers handled: {log.customers_handled}</p>
+              <p className="text-sm text-ink-soft">Customers handled: {log.customers_handled}</p>
             )}
-            {log.key_activities && <p className="mt-1 text-sm text-stone-700 dark:text-stone-300">{log.key_activities}</p>}
-            {log.sales_notes && <p className="mt-1 text-sm text-green-700 dark:text-green-400">Sales: {log.sales_notes}</p>}
-            {log.issues && <p className="mt-1 text-sm text-red-700 dark:text-red-400">Issue: {log.issues}</p>}
+            {log.key_activities && <p className="mt-1 text-sm text-ink dark:text-ivory-dark-text">{log.key_activities}</p>}
+            {log.sales_notes && <p className="mt-1 text-sm text-sage-500">Sales: {log.sales_notes}</p>}
+            {log.issues && <p className="mt-1 text-sm text-bronze-500">Issue: {log.issues}</p>}
           </Card>
         ))}
         {filtered.length === 0 && (

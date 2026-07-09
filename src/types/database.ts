@@ -5,12 +5,16 @@ export type LeaveType = 'paid_leave' | 'unpaid_leave'
 export type LeaveRequestStatus = 'pending' | 'approved' | 'rejected'
 export type TodoStatus = 'pending' | 'in_progress' | 'done'
 
+export type ComplaintCategory = 'workplace' | 'schedule' | 'customer_incident' | 'equipment' | 'other'
+export type ComplaintStatus = 'open' | 'in_discussion' | 'resolved'
+
 export interface Employee {
   id: string
   name: string
   email: string
   role: Role
   weekly_off_day: WeekdayName | null
+  pin_hash: string | null
   created_at: string
 }
 
@@ -19,15 +23,50 @@ export interface Attendance {
   employee_id: string
   date: string
   check_in_time: string | null
-  check_in_lat: number | null
-  check_in_lng: number | null
   check_out_time: string | null
-  check_out_lat: number | null
-  check_out_lng: number | null
+  check_in_photo: string | null
+  check_out_photo: string | null
   is_late: boolean
   is_half_day: boolean
   status: AttendanceStatus | null
   created_at: string
+}
+
+export interface RegisteredDevice {
+  id: string
+  device_token: string
+  name: string
+  registered_by: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface Complaint {
+  id: string
+  employee_id: string
+  category: ComplaintCategory
+  subject: string
+  status: ComplaintStatus
+  created_at: string
+}
+
+export interface ComplaintMessage {
+  id: string
+  complaint_id: string
+  sender_id: string | null
+  body: string
+  is_system: boolean
+  created_at: string
+}
+
+export interface KioskRosterEntry {
+  employee_id: string
+  name: string
+  checked_in: boolean
+  completed: boolean
+  check_in_time: string | null
+  check_out_time: string | null
+  require_photo: boolean
 }
 
 export interface LeaveBalance {
@@ -120,5 +159,6 @@ export interface StoreConfig {
   weekday_open_time: string
   sunday_open_time: string
   late_threshold_minutes: number
+  require_photo: boolean
 }
 

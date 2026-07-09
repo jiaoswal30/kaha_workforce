@@ -2,24 +2,34 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
 
-  --color-cream: #faf8f5;
-  --color-charcoal: #1f1c1a;
-  --color-stone-50: #faf8f5;
-  --color-stone-100: #f2ede6;
-  --color-stone-200: #e6ddd1;
-  --color-stone-300: #d3c4b0;
-  --color-stone-600: #8a7d6d;
-  --color-stone-700: #5e5346;
-  --color-stone-800: #3a332b;
-  --color-stone-900: #211d18;
+  /* Quiet-luxury palette: warm ivory paper, charcoal ink, champagne gold. */
+  --color-ivory: #faf8f4;
+  --color-ink: #211d19;
+  --color-ink-soft: #8a8178;
+  --color-hairline: #e8e2d8;
 
-  --color-accent-50: #fbf3ee;
-  --color-accent-100: #f4dfd2;
-  --color-accent-400: #c58b6f;
-  --color-accent-500: #ad6f52;
-  --color-accent-600: #8f5a41;
-  --color-accent-700: #6f4632;
+  --color-gold-400: #c2a577;
+  --color-gold-500: #a8895b;
+  --color-gold-600: #8c6f44;
+  --color-gold-tint: #f5efe4;
+
+  --color-sage-500: #5e7a5e;
+  --color-sage-tint: #edf1ed;
+  --color-bronze-500: #a6742c;
+  --color-bronze-tint: #f6efe3;
+  --color-brick-500: #a34d3f;
+  --color-brick-tint: #f6ebe9;
+  --color-slate-500: #5c6b7a;
+  --color-slate-tint: #eceff2;
+
+  /* dark mode surfaces */
+  --color-espresso: #181410;
+  --color-espresso-2: #221d18;
+  --color-hairline-dark: #372f28;
+  --color-ivory-dark-text: #ede7de;
+  --color-ink-soft-dark: #9c9184;
 }
 
 :root {
@@ -32,18 +42,92 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: var(--color-stone-50);
-  color: var(--color-charcoal);
+  font-family: var(--font-sans);
+  background: var(--color-ivory);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 @media (prefers-color-scheme: dark) {
   body {
-    background: var(--color-stone-900);
-    color: var(--color-stone-100);
+    background: var(--color-espresso);
+    color: var(--color-ivory-dark-text);
   }
 }
 
 input, select, textarea, button {
   font-family: inherit;
+  font-size: inherit;
+}
+
+/* ---- brand primitives -------------------------------------------------- */
+
+.font-display {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* small-caps letterspaced section label */
+.label-caps {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+@media (prefers-color-scheme: dark) {
+  .label-caps { color: var(--color-ink-soft-dark); }
+}
+
+/* ---- animations --------------------------------------------------------- */
+
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-150%) skewX(-12deg); }
+  100% { transform: translateX(350%) skewX(-12deg); }
+}
+
+@keyframes soft-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes check-draw {
+  from { stroke-dashoffset: 48; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes dot-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+.page-enter { animation: rise-in 150ms ease-out both; }
+.skeleton { animation: soft-pulse 1.2s ease-in-out infinite; background: var(--color-hairline); border-radius: 8px; }
+@media (prefers-color-scheme: dark) {
+  .skeleton { background: var(--color-hairline-dark); }
+}
+.spin-diamond { display: inline-block; animation: spin-slow 1.2s linear infinite; }
+.check-path { stroke-dasharray: 48; animation: check-draw 500ms ease-out 150ms both; }
+.pin-shake { animation: dot-shake 240ms ease-in-out; }
+
+.shimmer-wrap { position: relative; overflow: hidden; }
+.shimmer-bar {
+  position: absolute;
+  inset-block: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(168, 137, 91, 0.35), transparent);
+  animation: shimmer-sweep 2.2s ease-in-out infinite;
 }

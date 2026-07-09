@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, type FormEvent } from 'react'
+import { format } from 'date-fns'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { todayISO, currentWeekStartISO } from '../../lib/dates'
-import { Card, Button, EmptyState } from '../../components/ui'
+import { Card, SectionLabel, Button, Input, Chip, EmptyState, PageSkeleton, ProgressRing } from '../../components/ui'
 import type { Todo, WeeklyGoal, TodoStatus } from '../../types/database'
 
 const STATUS_CYCLE: Record<TodoStatus, TodoStatus> = {
@@ -11,10 +12,10 @@ const STATUS_CYCLE: Record<TodoStatus, TodoStatus> = {
   done: 'pending',
 }
 
-const STATUS_LABEL: Record<TodoStatus, string> = {
-  pending: 'Pending',
-  in_progress: 'In progress',
-  done: 'Done',
+const STATUS_META: Record<TodoStatus, { label: string; tone: 'neutral' | 'gold' | 'sage' }> = {
+  pending: { label: 'Pending', tone: 'neutral' },
+  in_progress: { label: 'In progress', tone: 'gold' },
+  done: { label: 'Done', tone: 'sage' },
 }
 
 export default function EmployeeTasks() {
@@ -45,7 +46,12 @@ export default function EmployeeTasks() {
   async function addTodo(e: FormEvent) {
     e.preventDefault()
     if (!employee || !title.trim()) return
-    await supabase.from('todos').insert({ employee_id: employee.id, date: todayISO(), title: title.trim(), description: description.trim() || null })
+    await supabase.from('todos').insert({
+      employee_id: employee.id,
+      date: todayISO(),
+      title: title.trim(),
+      description: description.trim() || null,
+    })
     setTitle('')
     setDescription('')
     await load()
@@ -63,7 +69,11 @@ export default function EmployeeTasks() {
   async function addGoal(e: FormEvent) {
     e.preventDefault()
     if (!employee || !goalTitle.trim() || goals.length >= 5) return
-    await supabase.from('weekly_goals').insert({ employee_id: employee.id, week_start: currentWeekStartISO(), title: goalTitle.trim() })
+    await supabase.from('weekly_goals').insert({
+      employee_id: employee.id,
+      week_start: currentWeekStartISO(),
+      title: goalTitle.trim(),
+    })
     setGoalTitle('')
     await load()
   }
@@ -75,46 +85,33 @@ export default function EmployeeTasks() {
 
   const completedGoals = goals.filter((g) => g.is_completed).length
 
-  if (loading) return <p className="text-stone-500">Loading…</p>
+  if (loading) return <PageSkeleton />
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Tasks</h1>
+    <div className="space-y-5">
+      <h1 className="font-display text-2xl text-ink dark:text-ivory-dark-text">Tasks</h1>
 
       <Card>
-        <p className="mb-2 text-sm font-medium text-stone-700 dark:text-stone-300">Today's to-dos</p>
-        <form onSubmit={addTodo} className="mb-3 space-y-2">
-          <input
-            placeholder="New task"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none dark:border-stone-700 dark:bg-stone-900"
-          />
-          <input
-            placeholder="Description (optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none dark:border-stone-700 dark:bg-stone-900"
-          />
-          <Button type="submit" className="w-full py-2 text-sm">Add task</Button>
+        <SectionLabel>Today's to-dos</SectionLabel>
+        <form onSubmit={addTodo} className="mb-4 space-y-2">
+          <Input placeholder="New task" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <Button type="submit" className="w-full !py-2 text-xs">Add task</Button>
         </form>
-        <ul className="divide-y divide-stone-100 dark:divide-stone-800">
+        <ul className="divide-y divide-hairline dark:divide-hairline-dark">
           {todos.map((t) => (
-            <li key={t.id} className="py-2">
+            <li key={t.id} className="py-3">
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className={`text-sm font-medium ${t.status === 'done' ? 'text-stone-400 line-through' : 'text-stone-900 dark:text-stone-50'}`}>
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium ${t.status === 'done' ? 'text-ink-soft line-through' : 'text-ink dark:text-ivory-dark-text'}`}>
                     {t.title}
-                    {t.carried_from && <span className="ml-2 rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-normal text-stone-600 dark:bg-stone-700 dark:text-stone-300">carried over</span>}
                   </p>
-                  {t.description && <p className="text-xs text-stone-500">{t.description}</p>}
-                  {t.admin_comment && <p className="mt-1 text-xs text-accent-600">Admin: {t.admin_comment}</p>}
+                  {t.carried_from && <Chip tone="neutral">carried over</Chip>}
+                  {t.description && <p className="mt-0.5 text-xs text-ink-soft">{t.description}</p>}
+                  {t.admin_comment && <p className="mt-1 text-xs italic text-gold-600">Admin: {t.admin_comment}</p>}
                 </div>
-                <button
-                  onClick={() => cycleStatus(t)}
-                  className="whitespace-nowrap rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700 dark:bg-stone-700 dark:text-stone-200"
-                >
-                  {STATUS_LABEL[t.status]}
+                <button onClick={() => cycleStatus(t)} className="shrink-0">
+                  <Chip tone={STATUS_META[t.status].tone}>{STATUS_META[t.status].label}</Chip>
                 </button>
               </div>
             </li>
@@ -124,26 +121,33 @@ export default function EmployeeTasks() {
       </Card>
 
       <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-medium text-stone-700 dark:text-stone-300">Weekly goals</p>
-          <span className="text-xs text-stone-500">{completedGoals}/{goals.length || 5} completed</span>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <SectionLabel>Weekly goals</SectionLabel>
+            <p className="-mt-1 text-xs text-ink-soft">Week of {format(new Date(currentWeekStartISO() + 'T00:00:00'), 'd MMMM')}</p>
+          </div>
+          <div className="relative">
+            <ProgressRing value={completedGoals} total={Math.max(goals.length, 1)} />
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-ink dark:text-ivory-dark-text">
+              {completedGoals}/{goals.length}
+            </span>
+          </div>
         </div>
-        {goals.length < 5 && (
+        {goals.length < 5 ? (
           <form onSubmit={addGoal} className="mb-3 flex gap-2">
-            <input
-              placeholder="New weekly goal"
-              value={goalTitle}
-              onChange={(e) => setGoalTitle(e.target.value)}
-              className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none dark:border-stone-700 dark:bg-stone-900"
-            />
-            <Button type="submit" className="px-3 py-2 text-sm">Add</Button>
+            <Input placeholder="New weekly goal" value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} className="!py-2" />
+            <Button type="submit" className="!py-2 text-xs">Add</Button>
           </form>
+        ) : (
+          <p className="mb-3 text-xs text-ink-soft">Max 5 goals per week.</p>
         )}
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {goals.map((g) => (
-            <li key={g.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={g.is_completed} onChange={() => toggleGoal(g)} className="h-4 w-4 accent-accent-600" />
-              <span className={g.is_completed ? 'text-stone-400 line-through' : 'text-stone-900 dark:text-stone-50'}>{g.title}</span>
+            <li key={g.id} className="flex items-center gap-2.5">
+              <input type="checkbox" checked={g.is_completed} onChange={() => toggleGoal(g)} className="h-4 w-4 accent-gold-500" />
+              <span className={`text-sm ${g.is_completed ? 'text-ink-soft line-through' : 'text-ink dark:text-ivory-dark-text'}`}>
+                {g.title}
+              </span>
             </li>
           ))}
         </ul>

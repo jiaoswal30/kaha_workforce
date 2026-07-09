@@ -2,12 +2,12 @@ import { startOfMonth, endOfMonth, eachDayOfInterval, format, getDay } from 'dat
 import type { Attendance, WeekdayName } from '../types/database'
 
 const STATUS_COLORS: Record<string, string> = {
-  present: 'bg-green-500',
-  half_day: 'bg-orange-500',
-  absent: 'bg-red-500',
-  week_off: 'bg-blue-500',
-  paid_leave: 'bg-yellow-500',
-  unpaid_leave: 'bg-red-500',
+  present: 'bg-sage-500 text-white',
+  half_day: 'bg-bronze-500 text-white',
+  absent: 'bg-brick-500 text-white',
+  week_off: 'bg-slate-500 text-white',
+  paid_leave: 'bg-gold-500 text-white',
+  unpaid_leave: 'bg-brick-500 text-white',
 }
 
 const WEEKDAY_INDEX: WeekdayName[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -32,12 +32,12 @@ export default function MonthCalendar({
 
   return (
     <div>
-      <div className="mb-1 grid grid-cols-7 text-center text-xs text-stone-400">
+      <div className="mb-1.5 grid grid-cols-7 text-center text-[10px] font-medium tracking-wider text-ink-soft">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
           <div key={i}>{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {Array.from({ length: leadingBlanks }).map((_, i) => (
           <div key={`b${i}`} />
         ))}
@@ -46,35 +46,38 @@ export default function MonthCalendar({
           const rec = byDate.get(dateStr)
           const isFuture = dateStr > todayStr
           const isUpcomingOff = isFuture && weeklyOffDay && WEEKDAY_INDEX[getDay(d)] === weeklyOffDay
-          const color = rec?.status ? STATUS_COLORS[rec.status] : isUpcomingOff ? 'bg-blue-200' : undefined
+          const statusCls = rec?.status ? STATUS_COLORS[rec.status] : null
           return (
             <div
               key={dateStr}
               className={`flex aspect-square items-center justify-center rounded-lg text-xs font-medium ${
-                color ? `${color} text-white` : 'bg-stone-100 text-stone-500 dark:bg-stone-800'
-              } ${dateStr === todayStr ? 'ring-2 ring-accent-600 ring-offset-1' : ''}`}
-              title={rec?.status ?? (isUpcomingOff ? 'upcoming week off' : '')}
+                statusCls ??
+                (isUpcomingOff
+                  ? 'border border-slate-500/50 text-slate-500'
+                  : 'bg-ivory text-ink-soft dark:bg-espresso')
+              } ${dateStr === todayStr ? 'ring-1 ring-gold-500 ring-offset-2 ring-offset-white dark:ring-offset-espresso-2' : ''}`}
+              title={rec?.status?.replace('_', ' ') ?? (isUpcomingOff ? 'upcoming week off' : '')}
             >
               {d.getDate()}
             </div>
           )
         })}
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-500">
-        <Legend color="bg-green-500" label="Worked" />
-        <Legend color="bg-blue-500" label="Week off" />
-        <Legend color="bg-yellow-500" label="Paid leave" />
-        <Legend color="bg-orange-500" label="Half day" />
-        <Legend color="bg-red-500" label="Absent/unpaid" />
+      <div className="mt-4 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[11px] text-ink-soft">
+        <Legend cls="bg-sage-500" label="Worked" />
+        <Legend cls="bg-slate-500" label="Week off" />
+        <Legend cls="bg-gold-500" label="Paid leave" />
+        <Legend cls="bg-bronze-500" label="Half day" />
+        <Legend cls="bg-brick-500" label="Absent" />
       </div>
     </div>
   )
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function Legend({ cls, label }: { cls: string; label: string }) {
   return (
-    <span className="flex items-center gap-1">
-      <span className={`h-2.5 w-2.5 rounded-full ${color}`} /> {label}
+    <span className="flex items-center gap-1.5">
+      <span className={`h-2 w-2 rounded-full ${cls}`} /> {label}
     </span>
   )
 }
