@@ -7,6 +7,23 @@ export type TodoStatus = 'pending' | 'in_progress' | 'done'
 
 export type ComplaintCategory = 'workplace' | 'schedule' | 'customer_incident' | 'equipment' | 'other'
 export type ComplaintStatus = 'open' | 'in_discussion' | 'resolved'
+export type FollowupType = 'order' | 'conversion' | 'query'
+export type FollowupPriority = 'low' | 'medium' | 'high'
+
+export interface Followup {
+  id: string
+  employee_id: string
+  created_by: string | null
+  type: FollowupType
+  customer_name: string
+  contact: string | null
+  details: string | null
+  priority: FollowupPriority
+  due_date: string
+  status: 'pending' | 'done'
+  completed_at: string | null
+  created_at: string
+}
 
 export interface Employee {
   id: string

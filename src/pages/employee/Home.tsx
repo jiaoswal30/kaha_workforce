@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { todayISO, formatTime, hoursWorked } from '../../lib/dates'
 import { Card, SectionLabel, Button, Banner, Chip, Input, PageSkeleton } from '../../components/ui'
-import type { Attendance, LeaveBalance, Todo, WeekdayName } from '../../types/database'
+import { isDueToday, isOverdue, notifyDueFollowups, sortByUrgency, FOLLOWUP_TYPE_LABELS } from '../../lib/followups'
+import type { Attendance, Followup, LeaveBalance, Todo, WeekdayName } from '../../types/database'
 
 const WEEKDAY_INDEX: WeekdayName[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
@@ -32,6 +33,7 @@ export default function EmployeeHome() {
   const [attendance, setAttendance] = useState<Attendance | null>(null)
   const [balance, setBalance] = useState<LeaveBalance | null>(null)
   const [todos, setTodos] = useState<Todo[]>([])
+  const [dueFollowups, setDueFollowups] = useState<Followup[]>([])
   const [newTask, setNewTask] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -39,21 +41,26 @@ export default function EmployeeHome() {
   const load = useCallback(async () => {
     if (!employee) return
     await supabase.rpc('carry_over_my_todos')
-    const [{ data: att }, { data: bal }, { data: t }, { data: allAnn }, { data: reads }] = await Promise.all([
-      supabase.from('attendance').select('*').eq('employee_id', employee.id).eq('date', todayISO()).maybeSingle(),
-      supabase.rpc('get_my_leave_balance', {
-        p_month: new Date().getMonth() + 1,
-        p_year: new Date().getFullYear(),
-      }),
-      supabase.from('todos').select('*').eq('employee_id', employee.id).eq('date', todayISO()).order('created_at'),
-      supabase.from('announcements').select('id'),
-      supabase.from('announcement_reads').select('announcement_id').eq('employee_id', employee.id),
-    ])
+    const [{ data: att }, { data: bal }, { data: t }, { data: allAnn }, { data: reads }, { data: fups }] =
+      await Promise.all([
+        supabase.from('attendance').select('*').eq('employee_id', employee.id).eq('date', todayISO()).maybeSingle(),
+        supabase.rpc('get_my_leave_balance', {
+          p_month: new Date().getMonth() + 1,
+          p_year: new Date().getFullYear(),
+        }),
+        supabase.from('todos').select('*').eq('employee_id', employee.id).eq('date', todayISO()).order('created_at'),
+        supabase.from('announcements').select('id'),
+        supabase.from('announcement_reads').select('announcement_id').eq('employee_id', employee.id),
+        supabase.from('followups').select('*').eq('employee_id', employee.id).eq('status', 'pending'),
+      ])
     setAttendance(att ?? null)
     setBalance((bal as LeaveBalance) ?? null)
     setTodos(t ?? [])
     const readIds = new Set((reads ?? []).map((r: { announcement_id: string }) => r.announcement_id))
     setUnreadCount((allAnn ?? []).filter((a: { id: string }) => !readIds.has(a.id)).length)
+    const due = sortByUrgency((fups ?? []).filter((f: Followup) => isOverdue(f) || isDueToday(f)))
+    setDueFollowups(due)
+    notifyDueFollowups(fups ?? [])
     setLoading(false)
   }, [employee])
 
@@ -97,6 +104,27 @@ export default function EmployeeHome() {
           <Banner tone="info">
             {unreadCount} unread notice{unreadCount > 1 ? 's' : ''} — tap to read
           </Banner>
+        </Link>
+      )}
+
+      {dueFollowups.length > 0 && (
+        <Link to="/followups" className="block lg:col-span-2">
+          <Card className="!border-bronze-500/40">
+            <SectionLabel>Follow-ups needing attention</SectionLabel>
+            <ul className="space-y-1.5">
+              {dueFollowups.slice(0, 3).map((f) => (
+                <li key={f.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate text-ink dark:text-ivory-dark-text">
+                    {f.customer_name} · {FOLLOWUP_TYPE_LABELS[f.type]}
+                  </span>
+                  <span className={`shrink-0 text-xs font-medium ${isOverdue(f) ? 'text-brick-500' : 'text-bronze-500'}`}>
+                    {isOverdue(f) ? 'Overdue' : 'Due today'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {dueFollowups.length > 3 && <p className="mt-1.5 text-xs text-gold-600">+{dueFollowups.length - 3} more</p>}
+          </Card>
         </Link>
       )}
 

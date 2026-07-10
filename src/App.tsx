@@ -9,6 +9,8 @@ import EmployeeLeave from './pages/employee/Leave'
 import EmployeeTasks from './pages/employee/Tasks'
 import EmployeeDailyLog from './pages/employee/DailyLog'
 import Concerns from './pages/employee/Concerns'
+import EmployeeFollowups from './pages/employee/Followups'
+import AdminFollowups from './pages/admin/Followups'
 import NotesPage from './pages/shared/Notes'
 import AnnouncementsPage from './pages/shared/Announcements'
 import AdminHome from './pages/admin/Home'
@@ -47,6 +49,7 @@ const adminRoutes = [
   { path: '/admin/team', element: <AdminTeam /> },
   { path: '/admin/concerns', element: <AdminConcerns /> },
   { path: '/admin/performance', element: <AdminPerformance /> },
+  { path: '/admin/followups', element: <AdminFollowups /> },
 ]
 
 export default function App() {
@@ -69,6 +72,7 @@ export default function App() {
             <Route path="/tasks" element={<EmployeeTasks />} />
             <Route path="/log" element={<EmployeeDailyLog />} />
             <Route path="/concerns" element={<Concerns />} />
+            <Route path="/followups" element={<EmployeeFollowups />} />
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
             {adminRoutes.map((r) => (
