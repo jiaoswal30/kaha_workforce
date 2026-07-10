@@ -1,15 +1,18 @@
 import { useEffect, useState, useCallback, type FormEvent } from 'react'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
-import { todayISO, currentWeekStartISO } from '../../lib/dates'
+import { todayISO, currentWeekStartISO, formatDate } from '../../lib/dates'
+import { sortByUrgency, isOverdue, FOLLOWUP_TYPE_LABELS } from '../../lib/followups'
 import { Card, SectionLabel, Button, Input, Chip, EmptyState, PageSkeleton, ProgressRing } from '../../components/ui'
-import type { Todo, WeeklyGoal } from '../../types/database'
+import type { Followup, Todo, WeeklyGoal } from '../../types/database'
 
 export default function EmployeeTasks() {
   const { employee } = useAuth()
   const [todos, setTodos] = useState<Todo[]>([])
   const [goals, setGoals] = useState<WeeklyGoal[]>([])
+  const [followups, setFollowups] = useState<Followup[]>([])
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -18,12 +21,20 @@ export default function EmployeeTasks() {
   const load = useCallback(async () => {
     if (!employee) return
     await supabase.rpc('carry_over_my_todos')
-    const [{ data: t }, { data: g }] = await Promise.all([
+    const weekEnd = format(addDays(new Date(currentWeekStartISO() + 'T00:00:00'), 6), 'yyyy-MM-dd')
+    const [{ data: t }, { data: g }, { data: f }] = await Promise.all([
       supabase.from('todos').select('*').eq('employee_id', employee.id).eq('date', todayISO()).order('created_at'),
       supabase.from('weekly_goals').select('*').eq('employee_id', employee.id).eq('week_start', currentWeekStartISO()).order('created_at'),
+      supabase
+        .from('followups')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .eq('status', 'pending')
+        .lte('due_date', weekEnd),
     ])
     setTodos(t ?? [])
     setGoals(g ?? [])
+    setFollowups(sortByUrgency(f ?? []))
     setLoading(false)
   }, [employee])
 
@@ -71,7 +82,17 @@ export default function EmployeeTasks() {
     await load()
   }
 
+  async function completeFollowup(f: Followup) {
+    await supabase
+      .from('followups')
+      .update({ status: 'done', completed_at: new Date().toISOString() })
+      .eq('id', f.id)
+    await load()
+  }
+
   const completedGoals = goals.filter((g) => g.is_completed).length
+  const dueNowFollowups = followups.filter((f) => f.due_date <= todayISO())
+  const laterThisWeek = followups.filter((f) => f.due_date > todayISO())
 
   if (loading) return <PageSkeleton />
 
@@ -81,6 +102,31 @@ export default function EmployeeTasks() {
 
       <Card>
         <SectionLabel>Today's to-dos</SectionLabel>
+
+        {dueNowFollowups.length > 0 && (
+          <ul className="mb-3 space-y-2.5 border-b border-hairline pb-3 dark:border-hairline-dark">
+            {dueNowFollowups.map((f) => (
+              <li key={f.id} className="flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={false}
+                  onChange={() => completeFollowup(f)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-gold-500"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm text-ink dark:text-ivory-dark-text">
+                    Follow up: {f.customer_name}
+                    <span className="ml-2 inline-block align-middle"><Chip tone="gold">{FOLLOWUP_TYPE_LABELS[f.type]}</Chip></span>
+                  </p>
+                  <p className={`text-xs ${isOverdue(f) ? 'font-medium text-brick-500' : 'text-bronze-500'}`}>
+                    {isOverdue(f) ? `Overdue — was due ${formatDate(f.due_date)}` : 'Due today'}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <form onSubmit={addTodo} className="mb-4 space-y-2">
           <Input placeholder="New task" value={title} onChange={(e) => setTitle(e.target.value)} />
           <Input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -106,7 +152,24 @@ export default function EmployeeTasks() {
             </li>
           ))}
         </ul>
-        {todos.length === 0 && <EmptyState>No tasks yet today.</EmptyState>}
+        {todos.length === 0 && dueNowFollowups.length === 0 && <EmptyState>No tasks yet today.</EmptyState>}
+
+        {laterThisWeek.length > 0 && (
+          <div className="mt-3 border-t border-hairline pt-3 dark:border-hairline-dark">
+            <p className="label-caps mb-2">Follow-ups later this week</p>
+            <ul className="space-y-1">
+              {laterThisWeek.map((f) => (
+                <li key={f.id} className="flex items-center justify-between text-xs">
+                  <span className="truncate text-ink dark:text-ivory-dark-text">
+                    {f.customer_name} · {FOLLOWUP_TYPE_LABELS[f.type]}
+                  </span>
+                  <span className="shrink-0 text-ink-soft">{formatDate(f.due_date)}</span>
+                </li>
+              ))}
+            </ul>
+            <Link to="/followups" className="mt-2 block text-xs font-medium text-gold-600">All follow-ups →</Link>
+          </div>
+        )}
       </Card>
 
       <Card>

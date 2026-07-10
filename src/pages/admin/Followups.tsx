@@ -5,12 +5,13 @@ import { Card, SectionLabel, Button, Banner, Input, Select, Textarea, PageSkelet
 import FollowupItem from '../../components/FollowupItem'
 import { sortByUrgency } from '../../lib/followups'
 import { todayISO } from '../../lib/dates'
-import type { Employee, Followup, FollowupPriority, FollowupType } from '../../types/database'
+import type { Employee, Followup, FollowupPriority, FollowupTransfer, FollowupType } from '../../types/database'
 
 export default function AdminFollowups() {
   const { employee: admin } = useAuth()
   const [items, setItems] = useState<Followup[] | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [transfers, setTransfers] = useState<FollowupTransfer[]>([])
   const [assignee, setAssignee] = useState('')
   const [type, setType] = useState<FollowupType>('query')
   const [customer, setCustomer] = useState('')
@@ -23,12 +24,14 @@ export default function AdminFollowups() {
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [{ data: f }, { data: emps }] = await Promise.all([
+    const [{ data: f }, { data: emps }, { data: trans }] = await Promise.all([
       supabase.from('followups').select('*').order('due_date'),
       supabase.from('employees').select('*').eq('role', 'employee').order('name'),
+      supabase.from('followup_transfers').select('*').order('created_at'),
     ])
     setItems(f ?? [])
     setEmployees(emps ?? [])
+    setTransfers(trans ?? [])
     if (emps && emps.length > 0) setAssignee((cur) => cur || emps[0].id)
   }, [])
 
@@ -38,6 +41,13 @@ export default function AdminFollowups() {
 
   function employeeName(id: string) {
     return employees.find((e) => e.id === id)?.name?.split(' ')[0] ?? 'Employee'
+  }
+
+  /** Chain of custody: [first owner, …, current owner] via transfer history. */
+  function chainFor(f: Followup): string[] {
+    const trail = transfers.filter((t) => t.followup_id === f.id)
+    if (trail.length === 0) return [employeeName(f.employee_id)]
+    return [employeeName(trail[0].from_employee), ...trail.map((t) => employeeName(t.to_employee))]
   }
 
   async function add(e: FormEvent) {
@@ -127,7 +137,7 @@ export default function AdminFollowups() {
         {pending.length === 0 && <EmptyState>Nothing open — all followed up ✦</EmptyState>}
         <ul className="space-y-2.5">
           {pending.map((f) => (
-            <FollowupItem key={f.id} followup={f} ownerName={employeeName(f.employee_id)} onDone={markDone} busy={busyId === f.id} />
+            <FollowupItem key={f.id} followup={f} chain={chainFor(f)} onDone={markDone} busy={busyId === f.id} />
           ))}
         </ul>
       </Card>
@@ -137,7 +147,7 @@ export default function AdminFollowups() {
         {completed.length === 0 && <EmptyState>None completed yet.</EmptyState>}
         <ul className="space-y-2.5">
           {completed.map((f) => (
-            <FollowupItem key={f.id} followup={f} ownerName={employeeName(f.employee_id)} />
+            <FollowupItem key={f.id} followup={f} chain={chainFor(f)} />
           ))}
         </ul>
       </Card>

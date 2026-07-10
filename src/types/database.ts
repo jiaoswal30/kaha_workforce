@@ -47,6 +47,14 @@ export interface StockReason {
   note: string | null
 }
 
+export interface FollowupTransfer {
+  id: string
+  followup_id: string
+  from_employee: string
+  to_employee: string
+  created_at: string
+}
+
 export interface Followup {
   id: string
   employee_id: string

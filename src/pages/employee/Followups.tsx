@@ -6,11 +6,12 @@ import FollowupItem from '../../components/FollowupItem'
 import { sortByUrgency, notifyDueFollowups } from '../../lib/followups'
 import { enablePush, isPushEnabled, pushSupported } from '../../lib/push'
 import { todayISO } from '../../lib/dates'
-import type { Followup, FollowupPriority, FollowupType } from '../../types/database'
+import type { Employee, Followup, FollowupPriority, FollowupType } from '../../types/database'
 
 export default function EmployeeFollowups() {
   const { employee } = useAuth()
   const [items, setItems] = useState<Followup[] | null>(null)
+  const [teammates, setTeammates] = useState<Employee[]>([])
   const [type, setType] = useState<FollowupType>('query')
   const [customer, setCustomer] = useState('')
   const [contact, setContact] = useState('')
@@ -29,13 +30,13 @@ export default function EmployeeFollowups() {
 
   const load = useCallback(async () => {
     if (!employee) return
-    const { data } = await supabase
-      .from('followups')
-      .select('*')
-      .eq('employee_id', employee.id)
-      .order('due_date')
+    const [{ data }, { data: emps }] = await Promise.all([
+      supabase.from('followups').select('*').eq('employee_id', employee.id).order('due_date'),
+      supabase.from('employees').select('*').eq('role', 'employee').neq('id', employee.id).order('name'),
+    ])
     const list = data ?? []
     setItems(list)
+    setTeammates(emps ?? [])
     notifyDueFollowups(list)
   }, [employee])
 
@@ -78,6 +79,16 @@ export default function EmployeeFollowups() {
       .update({ status: 'done', completed_at: new Date().toISOString() })
       .eq('id', f.id)
     setBusyId(null)
+    await load()
+  }
+
+  async function passOn(f: Followup, toId: string) {
+    setError(null)
+    const { error } = await supabase.rpc('pass_followup', { p_followup_id: f.id, p_to: toId })
+    if (error) {
+      setError(error.message)
+      return
+    }
     await load()
   }
 
@@ -152,7 +163,7 @@ export default function EmployeeFollowups() {
         {pending.length === 0 && <EmptyState>All caught up ✦</EmptyState>}
         <ul className="space-y-2.5">
           {pending.map((f) => (
-            <FollowupItem key={f.id} followup={f} onDone={markDone} busy={busyId === f.id} />
+            <FollowupItem key={f.id} followup={f} onDone={markDone} busy={busyId === f.id} passTo={teammates} onPass={passOn} />
           ))}
         </ul>
       </Card>

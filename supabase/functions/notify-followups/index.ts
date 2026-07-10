@@ -41,13 +41,21 @@ Deno.serve(async (req) => {
   const messages: { employee_id: string; title: string; text: string }[] = []
 
   if (body?.record?.employee_id) {
-    // Mode 1: a follow-up was just assigned.
+    // Mode 1: a follow-up was just assigned or passed on.
     const r = body.record
-    messages.push({
-      employee_id: r.employee_id,
-      title: 'New follow-up assigned ✦',
-      text: `${r.customer_name} — ${TYPE_LABELS[r.type] ?? r.type} follow-up, due ${r.due_date}`,
-    })
+    if (body.kind === 'transfer') {
+      messages.push({
+        employee_id: r.employee_id,
+        title: 'Follow-up passed to you ✦',
+        text: `${body.from_name ?? 'A teammate'} passed you: ${r.customer_name} — ${TYPE_LABELS[r.type] ?? r.type}, due ${r.due_date}`,
+      })
+    } else {
+      messages.push({
+        employee_id: r.employee_id,
+        title: 'New follow-up assigned ✦',
+        text: `${r.customer_name} — ${TYPE_LABELS[r.type] ?? r.type} follow-up, due ${r.due_date}`,
+      })
+    }
   } else {
     // Mode 2: daily due/overdue summary.
     const today = istToday()
