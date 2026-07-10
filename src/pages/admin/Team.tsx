@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabaseClient'
-import { computeFaceDescriptor, preloadFaceModels } from '../../lib/face'
+import { averageDescriptors, computeFaceDescriptor, preloadFaceModels } from '../../lib/face'
 import { Card, SectionLabel, Button, Banner, Input, Chip, PageSkeleton, Select } from '../../components/ui'
 import type { Employee, RegisteredDevice, StoreConfig, WeekdayName } from '../../types/database'
 
@@ -377,12 +377,21 @@ function FaceEnrollModal({
     setStatus('working')
     setHint(null)
     try {
-      const descriptor = await computeFaceDescriptor(video)
-      if (!descriptor) {
-        setHint('No face detected — face the camera in good light and try again.')
-        setStatus('idle')
-        return
+      // Three samples ~a third of a second apart, averaged: much more stable
+      // than a single frame, which matters with a strict match threshold.
+      const samples: number[][] = []
+      for (let i = 0; i < 3; i++) {
+        setHint(`Hold still… capturing ${i + 1}/3`)
+        const d = await computeFaceDescriptor(video)
+        if (!d) {
+          setHint('Lost the face — stay centered in good light and try again.')
+          setStatus('idle')
+          return
+        }
+        samples.push(d)
+        await new Promise((r) => setTimeout(r, 350))
       }
+      const descriptor = averageDescriptors(samples)
       const { error } = await supabase.rpc('set_employee_face', {
         p_employee_id: employee.id,
         p_descriptor: descriptor,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { Delete, ShieldX } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { computeFaceDescriptor, facesMatch, preloadFaceModels } from '../lib/face'
+import { computeFaceDescriptor, faceDistance, FACE_MATCH_THRESHOLD, preloadFaceModels } from '../lib/face'
 import type { Attendance, KioskRosterEntry } from '../types/database'
 
 const DEVICE_TOKEN_KEY = 'kaha_device_token'
@@ -90,13 +90,20 @@ export default function Kiosk() {
 
   // Face verification: compare the captured face against the enrolled
   // descriptor of whoever's PIN was entered. Mismatch = denied, no check-in.
+  // Fails CLOSED: any error in the verification path denies rather than
+  // silently letting the check-in through.
   async function onCapture(employee: KioskRosterEntry, pin: string, photo: string, canvas: HTMLCanvasElement) {
     setView({ name: 'verifying' })
 
-    const { data: enrolled } = await supabase.rpc('kiosk_face_descriptor', {
+    const { data: enrolled, error: descError } = await supabase.rpc('kiosk_face_descriptor', {
       p_device_token: deviceToken,
       p_employee_id: employee.employee_id,
     })
+
+    if (descError) {
+      setView({ name: 'denied', message: 'Face check could not run: ' + descError.message })
+      return
+    }
 
     if (enrolled && Array.isArray(enrolled)) {
       let captured: number[] | null = null
@@ -110,7 +117,9 @@ export default function Kiosk() {
         setView({ name: 'denied', message: 'No face detected. Face the camera directly and try again.' })
         return
       }
-      if (!facesMatch(enrolled as number[], captured)) {
+      const distance = faceDistance(enrolled as number[], captured)
+      console.info(`[kiosk] face distance for ${employee.name}: ${distance.toFixed(3)} (threshold ${FACE_MATCH_THRESHOLD})`)
+      if (distance >= FACE_MATCH_THRESHOLD) {
         setView({
           name: 'denied',
           message: `This face doesn't match ${employee.name.split(' ')[0]}'s enrolled face. Check-in denied.`,
@@ -118,7 +127,8 @@ export default function Kiosk() {
         return
       }
     }
-    // Not enrolled yet: allow, the stored photo still serves as the audit trail.
+    // Not enrolled yet: allow — the stored photo is the audit trail. The
+    // Team page shows a "No face" chip until enrollment is done.
 
     await completeAction(employee, pin, photo)
   }

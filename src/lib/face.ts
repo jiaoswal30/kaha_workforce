@@ -38,15 +38,28 @@ export async function computeFaceDescriptor(
 }
 
 /**
- * Whether two descriptors belong to the same person. 0.6 is the library's
- * conventional euclidean-distance threshold; we use 0.55 (slightly stricter)
- * to favor rejecting an imposter over accepting a bad match.
+ * Euclidean distance between two descriptors (lower = more similar).
+ * The library's conventional same-person threshold is 0.6; we use 0.45 —
+ * deliberately strict because look-alikes (siblings) are a real scenario
+ * here. Cost: the right person may occasionally need a second attempt.
  */
-export function facesMatch(a: number[], b: number[]): boolean {
+export const FACE_MATCH_THRESHOLD = 0.45
+
+export function faceDistance(a: number[], b: number[]): number {
   let sum = 0
   for (let i = 0; i < a.length; i++) {
     const d = a[i] - b[i]
     sum += d * d
   }
-  return Math.sqrt(sum) < 0.55
+  return Math.sqrt(sum)
+}
+
+/**
+ * Averages several descriptors of the same person into one, which is more
+ * stable than any single capture (used at enrollment).
+ */
+export function averageDescriptors(samples: number[][]): number[] {
+  const out = new Array<number>(samples[0].length).fill(0)
+  for (const s of samples) for (let i = 0; i < s.length; i++) out[i] += s[i]
+  return out.map((v) => v / samples.length)
 }
