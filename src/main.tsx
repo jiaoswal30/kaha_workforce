@@ -8,6 +8,9 @@ import '@fontsource/fraunces/500.css'
 import '@fontsource/fraunces/600.css'
 import './index.css'
 import App from './App.tsx'
+import { registerServiceWorker } from './lib/push'
+
+registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

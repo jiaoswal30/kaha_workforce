@@ -57,6 +57,18 @@ npm run dev
 
 Import the repo (framework preset: Vite), add the two `VITE_*` env vars, deploy. `vercel.json` handles client-side routing. On the office computer, browse to `https://your-app.vercel.app/kiosk` after registering the device.
 
+## Push notifications (follow-ups)
+
+Real device notifications — instant on assignment, plus a daily 11:00 IST due/overdue reminder. One-time setup:
+
+1. **Deploy the edge function**: Dashboard → **Edge Functions → Deploy a new function**, name it exactly `notify-followups`, paste the contents of `supabase/functions/notify-followups/index.ts`, and turn **Verify JWT OFF** for this function.
+2. **Set its secrets** (Edge Functions → notify-followups → Secrets):
+   - `VAPID_PUBLIC_KEY` — the value of `VITE_VAPID_PUBLIC_KEY` in `.env`
+   - `VAPID_PRIVATE_KEY` — the private key generated alongside it (keep it only here)
+   - `FN_SECRET` — the same secret used in `supabase/migrations/0009_push_notifications.sql`
+3. **Run `0009_push_notifications.sql`** in the SQL Editor (subscriptions table, instant-notify trigger, daily cron).
+4. Each employee opens **Follow-ups → "Enable notifications on this device"** once, on the device where they want pushes. iPhone users must first add the app to their Home Screen (Share → Add to Home Screen) — Safari requires that for push.
+
 ## Notes on business logic
 
 - **Kiosk RPCs** (`kiosk_roster`, `kiosk_check_in`, `kiosk_check_out`) run without a login session — the registered device token is the credential, validated server-side. Admin/management functions explicitly revoke anon access.

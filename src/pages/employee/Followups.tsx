@@ -3,7 +3,8 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { Card, SectionLabel, Button, Banner, Input, Select, Textarea, PageSkeleton, EmptyState } from '../../components/ui'
 import FollowupItem from '../../components/FollowupItem'
-import { sortByUrgency, enableReminders, remindersSupported, notifyDueFollowups } from '../../lib/followups'
+import { sortByUrgency, notifyDueFollowups } from '../../lib/followups'
+import { enablePush, isPushEnabled, pushSupported } from '../../lib/push'
 import { todayISO } from '../../lib/dates'
 import type { Followup, FollowupPriority, FollowupType } from '../../types/database'
 
@@ -19,7 +20,12 @@ export default function EmployeeFollowups() {
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [remindersOn, setRemindersOn] = useState(remindersSupported() && Notification.permission === 'granted')
+  const [pushOn, setPushOn] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+
+  useEffect(() => {
+    isPushEnabled().then(setPushOn)
+  }, [])
 
   const load = useCallback(async () => {
     if (!employee) return
@@ -89,14 +95,26 @@ export default function EmployeeFollowups() {
 
       {error && <Banner tone="error">{error}</Banner>}
 
-      {remindersSupported() && !remindersOn && (
+      {pushSupported() && !pushOn && (
         <button
-          onClick={async () => setRemindersOn(await enableReminders())}
-          className="w-full rounded-xl border border-gold-400 bg-gold-tint px-4 py-3 text-sm font-medium text-gold-600"
+          disabled={pushBusy}
+          onClick={async () => {
+            if (!employee) return
+            setPushBusy(true)
+            const result = await enablePush(employee.id)
+            setPushBusy(false)
+            if (result.ok) {
+              setPushOn(true)
+            } else {
+              setError(result.reason ?? 'Could not enable notifications.')
+            }
+          }}
+          className="w-full rounded-xl border border-gold-400 bg-gold-tint px-4 py-3 text-sm font-medium text-gold-600 disabled:opacity-50"
         >
-          🔔 Enable reminders on this device — get notified when a follow-up is due
+          {pushBusy ? 'Setting up…' : 'Enable notifications on this device — new assignments and due reminders, even when the app is closed'}
         </button>
       )}
+      {pushOn && <p className="text-xs text-sage-500">✓ Notifications are on for this device.</p>}
 
       <Card>
         <SectionLabel>New follow-up</SectionLabel>
