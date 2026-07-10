@@ -133,9 +133,24 @@ export default function StockPage() {
     return employees.find((e) => e.id === id)?.name?.split(' ')[0] ?? '—'
   }
 
+  async function claim() {
+    if (!today) return
+    setError(null)
+    setDeciding(true)
+    const { error } = await supabase.rpc('claim_stock_verification', { p_tally_id: today.id })
+    setDeciding(false)
+    if (error) {
+      setError(error.message)
+    }
+    await load()
+  }
+
   if (loading) return <PageSkeleton />
 
   const iAmApprover = today?.status === 'pending_approval' && today.approver_id === employee?.id
+  const iAmSubmitter = today?.submitted_by === employee?.id
+  const unclaimed = today?.status === 'pending_approval' && today.approver_id === null
+  const canClaim = unclaimed && !iAmSubmitter && employee?.role === 'employee'
   const showForm = !today || today.status === 'rejected'
 
   return (
@@ -155,12 +170,30 @@ export default function StockPage() {
 
       {/* Verification (assigned random checker or waiting view) */}
       {today?.status === 'pending_approval' && (
-        <Card className={iAmApprover ? '!border-gold-400' : ''}>
+        <Card className={iAmApprover || canClaim ? '!border-gold-400' : ''}>
           <SectionLabel>
-            {iAmApprover ? 'You were picked to verify today’s stock' : `Waiting for ${name(today.approver_id)} to verify`}
+            {unclaimed
+              ? iAmSubmitter
+                ? 'Waiting for a teammate to volunteer as verifier'
+                : 'This count needs a verifier'
+              : iAmApprover
+                ? 'You are verifying today’s stock'
+                : `${name(today.approver_id)} is verifying`}
           </SectionLabel>
           <p className="mb-3 text-xs text-ink-soft">Counted by {name(today.submitted_by)}.</p>
           <TallyTable categories={categories} counts={counts} reasons={reasons} />
+
+          {canClaim && (
+            <div className="mt-4 border-t border-hairline pt-3 dark:border-hairline-dark">
+              <Button busy={deciding} onClick={claim} className="w-full">
+                I'll verify this count
+              </Button>
+              <p className="mt-2 text-center text-xs text-ink-soft">
+                Your name goes on today's tally as the verifier.
+              </p>
+            </div>
+          )}
+
           {iAmApprover && (
             <div className="mt-4 space-y-2 border-t border-hairline pt-3 dark:border-hairline-dark">
               <div className="flex gap-2">
@@ -304,7 +337,7 @@ export default function StockPage() {
             Submit for verification
           </Button>
           <p className="mt-2 text-center text-xs text-ink-soft">
-            A randomly chosen teammate will be asked to verify your count.
+            A teammate will volunteer to verify your count — both names go on the record.
           </p>
         </Card>
       )}

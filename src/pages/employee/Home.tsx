@@ -110,9 +110,16 @@ export default function EmployeeHome() {
         </Link>
       )}
 
+      {todayStockTally?.status === 'pending_approval' &&
+        todayStockTally.approver_id === null &&
+        todayStockTally.submitted_by !== employee?.id && (
+          <Link to="/stock" className="block lg:col-span-2">
+            <Banner tone="warning">Today's stock count needs a verifier — tap to volunteer</Banner>
+          </Link>
+        )}
       {todayStockTally?.status === 'pending_approval' && todayStockTally.approver_id === employee?.id && (
         <Link to="/stock" className="block lg:col-span-2">
-          <Banner tone="warning">You've been picked to verify today's stock tally — tap to review</Banner>
+          <Banner tone="warning">You're verifying today's stock tally — tap to finish</Banner>
         </Link>
       )}
 
