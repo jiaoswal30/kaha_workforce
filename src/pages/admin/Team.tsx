@@ -210,7 +210,7 @@ export default function AdminTeam() {
 
           <div className="mt-3 flex gap-2">
             <Input
-              placeholder='Name, e.g. "Front desk PC"'
+              placeholder='Nickname, e.g. "Store laptop"'
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               className="!py-2 text-sm"
@@ -219,6 +219,19 @@ export default function AdminTeam() {
               Register this computer
             </Button>
           </div>
+          <p className="mt-2 text-xs text-ink-soft">
+            The nickname is just a label so you can recognize the machine in the list above — type anything. Clicking the
+            button trusts <em>the browser you're using right now</em>.
+          </p>
+
+          {localToken && (
+            <a
+              href="/kiosk"
+              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-gold-400 bg-gold-tint px-4 py-2.5 text-sm font-medium text-gold-600"
+            >
+              Open the attendance kiosk →
+            </a>
+          )}
         </div>
       </Card>
 

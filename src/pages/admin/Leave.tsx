@@ -153,6 +153,7 @@ export default function AdminLeave() {
                     )}
                   </div>
                 </div>
+                {r.reason && <p className="mt-1.5 text-xs text-ink dark:text-ivory-dark-text">Reason: {r.reason}</p>}
                 {r.admin_note && <p className="mt-1.5 text-xs text-ink-soft">{r.admin_note}</p>}
               </li>
             )

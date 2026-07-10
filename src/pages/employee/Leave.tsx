@@ -3,7 +3,7 @@ import { format, startOfMonth, endOfMonth, subDays, subMonths, addMonths } from 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
-import { Card, SectionLabel, Button, Banner, Input, Select, Chip, PageSkeleton } from '../../components/ui'
+import { Card, SectionLabel, Button, Banner, Input, Select, Textarea, Chip, PageSkeleton } from '../../components/ui'
 import MonthCalendar from '../../components/MonthCalendar'
 import { formatDate } from '../../lib/dates'
 import type { Attendance, LeaveBalance, LeaveRequest, LeaveType, WeekdayName } from '../../types/database'
@@ -20,6 +20,7 @@ export default function EmployeeLeave() {
   const [loading, setLoading] = useState(true)
   const [requestDate, setRequestDate] = useState('')
   const [leaveType, setLeaveType] = useState<LeaveType>('paid_leave')
+  const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -65,10 +66,20 @@ export default function EmployeeLeave() {
     if (!employee || !requestDate) return
     setError(null)
     setSuccess(null)
+    if (leaveType === 'unpaid_leave' && !reason.trim()) {
+      setError('Please give a reason for unpaid leave.')
+      return
+    }
     setSubmitting(true)
     const { data, error } = await supabase
       .from('leave_requests')
-      .insert({ employee_id: employee.id, requested_date: requestDate, leave_type: leaveType, status: 'pending' })
+      .insert({
+        employee_id: employee.id,
+        requested_date: requestDate,
+        leave_type: leaveType,
+        status: 'pending',
+        reason: leaveType === 'unpaid_leave' ? reason.trim() : null,
+      })
       .select()
       .single()
     setSubmitting(false)
@@ -77,10 +88,12 @@ export default function EmployeeLeave() {
     } else if (data.status === 'rejected') {
       setError('Two employees are already off that date — sent to admin for override.')
       setRequestDate('')
+      setReason('')
       await load()
     } else {
       setSuccess('Leave request submitted.')
       setRequestDate('')
+      setReason('')
       await load()
     }
   }
@@ -93,6 +106,10 @@ export default function EmployeeLeave() {
 
   const available = balance ? balance.paid_leaves_entitled - balance.carried_deduction - balance.paid_leaves_used : 0
   const isCurrentMonth = format(calMonth, 'yyyy-MM') === format(now, 'yyyy-MM')
+
+  useEffect(() => {
+    if (available <= 0 && leaveType === 'paid_leave') setLeaveType('unpaid_leave')
+  }, [available, leaveType])
 
   if (loading) return <PageSkeleton />
 
@@ -166,9 +183,22 @@ export default function EmployeeLeave() {
             onChange={(e) => setRequestDate(e.target.value)}
           />
           <Select value={leaveType} onChange={(e) => setLeaveType(e.target.value as LeaveType)}>
-            <option value="paid_leave">Paid leave</option>
+            <option value="paid_leave" disabled={available <= 0}>
+              Paid leave{available <= 0 ? ' — used this month' : ''}
+            </option>
             <option value="unpaid_leave">Unpaid leave</option>
           </Select>
+          {leaveType === 'paid_leave' ? (
+            <p className="text-xs text-ink-soft">Your one paid leave a month — no reason needed.</p>
+          ) : (
+            <Textarea
+              rows={2}
+              required
+              placeholder="Reason for unpaid leave"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          )}
           <Button type="submit" busy={submitting} className="w-full">Submit request</Button>
         </form>
       </Card>

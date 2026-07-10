@@ -100,6 +100,7 @@ export default function AdminHome() {
                   <p className="text-xs text-ink-soft">
                     {formatDate(r.requested_date)} · {r.leave_type === 'paid_leave' ? 'Paid' : 'Unpaid'}
                   </p>
+                  {r.reason && <p className="mt-0.5 text-xs text-ink dark:text-ivory-dark-text">"{r.reason}"</p>}
                 </div>
                 <div className="flex gap-1.5">
                   <Button variant="secondary" disabled={busyId === r.id} onClick={() => decide(r, false)} className="!px-3 !py-1.5 text-xs">

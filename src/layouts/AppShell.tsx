@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  Home, CalendarDays, CheckSquare, NotebookPen, MoreHorizontal,
+  Home, CalendarDays, CheckSquare, NotebookPen, MoreHorizontal, Monitor,
   MapPin, Users, Gem, Megaphone, MessageCircleWarning, BarChart3, ClipboardList, LogOut, X,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -35,6 +35,7 @@ const ADMIN_MORE: NavItem[] = [
   { to: '/admin/performance', label: 'Performance', icon: BarChart3 },
   { to: '/notes', label: 'Inventory notes', icon: Gem },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },
+  { to: '/kiosk', label: 'Attendance kiosk', icon: Monitor },
 ]
 
 export default function AppShell() {

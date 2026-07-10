@@ -89,6 +89,7 @@ export interface LeaveRequest {
   requested_date: string
   leave_type: LeaveType
   status: LeaveRequestStatus
+  reason: string | null
   admin_note: string | null
   created_at: string
 }
