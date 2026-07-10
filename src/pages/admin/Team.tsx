@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../../lib/supabaseClient'
+import { computeFaceDescriptor, preloadFaceModels } from '../../lib/face'
 import { Card, SectionLabel, Button, Banner, Input, Chip, PageSkeleton, Select } from '../../components/ui'
 import type { Employee, RegisteredDevice, StoreConfig, WeekdayName } from '../../types/database'
 
@@ -57,6 +58,7 @@ export default function AdminTeam() {
 
   const [deviceName, setDeviceName] = useState('')
   const [registering, setRegistering] = useState(false)
+  const [faceFor, setFaceFor] = useState<Employee | null>(null)
 
   const localToken = localStorage.getItem(DEVICE_TOKEN_KEY)
 
@@ -172,7 +174,11 @@ export default function AdminTeam() {
                   <p className="truncate font-medium text-ink dark:text-ivory-dark-text">{emp.name}</p>
                   <p className="truncate text-xs text-ink-soft">{emp.email}</p>
                 </div>
-                {emp.pin_hash ? <Chip tone="sage">PIN set</Chip> : <Chip tone="bronze">No PIN — kiosk blocked</Chip>}
+                <div className="flex shrink-0 gap-1.5">
+                  {emp.pin_hash ? <Chip tone="sage">PIN set</Chip> : <Chip tone="bronze">No PIN</Chip>}
+                  {config?.require_photo &&
+                    (emp.face_descriptor ? <Chip tone="sage">Face enrolled</Chip> : <Chip tone="bronze">No face</Chip>)}
+                </div>
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <Select
@@ -188,6 +194,11 @@ export default function AdminTeam() {
                 <Button variant="secondary" className="!py-1.5 text-xs" onClick={() => setPinFor(emp)}>
                   {emp.pin_hash ? 'Change PIN' : 'Set PIN'}
                 </Button>
+                {config?.require_photo && (
+                  <Button variant="secondary" className="!py-1.5 text-xs" onClick={() => setFaceFor(emp)}>
+                    {emp.face_descriptor ? 'Re-enroll face' : 'Enroll face'}
+                  </Button>
+                )}
               </div>
             </li>
           ))}
@@ -306,6 +317,121 @@ export default function AdminTeam() {
           </div>
         </div>
       )}
+
+      {faceFor && (
+        <FaceEnrollModal
+          employee={faceFor}
+          onClose={() => setFaceFor(null)}
+          onEnrolled={async () => {
+            setFaceFor(null)
+            setNotice(`Face enrolled for ${faceFor.name}. The kiosk will now verify it at every check-in.`)
+            await load()
+          }}
+          onError={(m) => setError(m)}
+        />
+      )}
+    </div>
+  )
+}
+
+function FaceEnrollModal({
+  employee,
+  onClose,
+  onEnrolled,
+  onError,
+}: {
+  employee: Employee
+  onClose: () => void
+  onEnrolled: () => void
+  onError: (message: string) => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [status, setStatus] = useState<'idle' | 'working'>('idle')
+  const [hint, setHint] = useState<string | null>(null)
+
+  useEffect(() => {
+    preloadFaceModels()
+    let cancelled = false
+    navigator.mediaDevices
+      .getUserMedia({ video: { width: 640, height: 480 }, audio: false })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        streamRef.current = stream
+        if (videoRef.current) videoRef.current.srcObject = stream
+      })
+      .catch(() => setCameraError('Camera unavailable — check permissions on this computer.'))
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
+
+  async function capture() {
+    const video = videoRef.current
+    if (!video) return
+    setStatus('working')
+    setHint(null)
+    try {
+      const descriptor = await computeFaceDescriptor(video)
+      if (!descriptor) {
+        setHint('No face detected — face the camera in good light and try again.')
+        setStatus('idle')
+        return
+      }
+      const { error } = await supabase.rpc('set_employee_face', {
+        p_employee_id: employee.id,
+        p_descriptor: descriptor,
+      })
+      if (error) {
+        onError(error.message)
+        setStatus('idle')
+        return
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      onEnrolled()
+    } catch {
+      setHint('Face detection failed to run — try again.')
+      setStatus('idle')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center px-6" onClick={onClose}>
+      <div className="absolute inset-0 bg-ink/30" />
+      <div
+        className="page-enter relative w-full max-w-sm rounded-[14px] border border-hairline bg-white p-5 dark:border-hairline-dark dark:bg-espresso-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <SectionLabel>Enroll face — {employee.name}</SectionLabel>
+        <p className="mb-3 text-xs text-ink-soft">
+          Have {employee.name.split(' ')[0]} face the camera in good light, then capture. The kiosk will compare every
+          future check-in against this.
+        </p>
+        {cameraError ? (
+          <Banner tone="error">{cameraError}</Banner>
+        ) : (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="mx-auto h-52 w-52 rounded-full border-2 border-gold-400 object-cover"
+            style={{ transform: 'scaleX(-1)' }}
+          />
+        )}
+        {hint && <p className="mt-2 text-center text-xs text-bronze-500">{hint}</p>}
+        <div className="mt-4 flex gap-2">
+          <Button busy={status === 'working'} onClick={capture} className="flex-1" disabled={!!cameraError}>
+            {status === 'working' ? 'Reading face…' : 'Capture & enroll'}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
-import { Delete } from 'lucide-react'
+import { Delete, ShieldX } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { computeFaceDescriptor, facesMatch, preloadFaceModels } from '../lib/face'
 import type { Attendance, KioskRosterEntry } from '../types/database'
 
 const DEVICE_TOKEN_KEY = 'kaha_device_token'
@@ -10,6 +11,8 @@ type View =
   | { name: 'roster' }
   | { name: 'pin'; employee: KioskRosterEntry; error?: string }
   | { name: 'camera'; employee: KioskRosterEntry; pin: string }
+  | { name: 'verifying' }
+  | { name: 'denied'; message: string }
   | { name: 'done'; message: string; note?: string }
 
 export default function Kiosk() {
@@ -83,6 +86,41 @@ export default function Kiosk() {
     } else {
       await completeAction(employee, pin, null)
     }
+  }
+
+  // Face verification: compare the captured face against the enrolled
+  // descriptor of whoever's PIN was entered. Mismatch = denied, no check-in.
+  async function onCapture(employee: KioskRosterEntry, pin: string, photo: string, canvas: HTMLCanvasElement) {
+    setView({ name: 'verifying' })
+
+    const { data: enrolled } = await supabase.rpc('kiosk_face_descriptor', {
+      p_device_token: deviceToken,
+      p_employee_id: employee.employee_id,
+    })
+
+    if (enrolled && Array.isArray(enrolled)) {
+      let captured: number[] | null = null
+      try {
+        captured = await computeFaceDescriptor(canvas)
+      } catch {
+        setView({ name: 'denied', message: 'Face check failed to run — try again or ask the admin.' })
+        return
+      }
+      if (!captured) {
+        setView({ name: 'denied', message: 'No face detected. Face the camera directly and try again.' })
+        return
+      }
+      if (!facesMatch(enrolled as number[], captured)) {
+        setView({
+          name: 'denied',
+          message: `This face doesn't match ${employee.name.split(' ')[0]}'s enrolled face. Check-in denied.`,
+        })
+        return
+      }
+    }
+    // Not enrolled yet: allow, the stored photo still serves as the audit trail.
+
+    await completeAction(employee, pin, photo)
   }
 
   if (unregistered) {
@@ -162,8 +200,29 @@ export default function Kiosk() {
         <CameraScreen
           employee={view.employee}
           onCancel={() => setView({ name: 'roster' })}
-          onCapture={(photo) => completeAction(view.employee, view.pin, photo)}
+          onCapture={(photo, canvas) => onCapture(view.employee, view.pin, photo, canvas)}
         />
+      )}
+
+      {view.name === 'verifying' && (
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <span className="spin-diamond font-display text-4xl text-gold-500">◇</span>
+          <p className="mt-5 font-display text-xl text-ink dark:text-ivory-dark-text">Verifying face…</p>
+        </div>
+      )}
+
+      {view.name === 'denied' && (
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <ShieldX size={56} strokeWidth={1.25} className="text-brick-500" />
+          <p className="mt-5 font-display text-xl text-ink dark:text-ivory-dark-text">Access denied</p>
+          <p className="mt-2 max-w-xs text-sm text-ink-soft">{view.message}</p>
+          <button
+            onClick={() => setView({ name: 'roster' })}
+            className="mt-8 rounded-xl border border-hairline px-5 py-2.5 text-sm text-ink dark:border-hairline-dark dark:text-ivory-dark-text"
+          >
+            Back
+          </button>
+        </div>
       )}
 
       {view.name === 'done' && (
@@ -260,7 +319,7 @@ function CameraScreen({
 }: {
   employee: KioskRosterEntry
   onCancel: () => void
-  onCapture: (photo: string) => void
+  onCapture: (photo: string, canvas: HTMLCanvasElement) => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -269,6 +328,7 @@ function CameraScreen({
   const capturedRef = useRef(false)
 
   useEffect(() => {
+    preloadFaceModels()
     let cancelled = false
     navigator.mediaDevices
       .getUserMedia({ video: { width: 640, height: 480 }, audio: false })
@@ -305,7 +365,7 @@ function CameraScreen({
     canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height)
     const photo = canvas.toDataURL('image/jpeg', 0.7)
     streamRef.current?.getTracks().forEach((t) => t.stop())
-    onCapture(photo)
+    onCapture(photo, canvas)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count])
 

@@ -15,6 +15,7 @@ export interface Employee {
   role: Role
   weekly_off_day: WeekdayName | null
   pin_hash: string | null
+  face_descriptor: number[] | null
   created_at: string
 }
 
