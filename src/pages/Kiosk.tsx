@@ -59,7 +59,11 @@ export default function Kiosk() {
     const row = data as Attendance
     const first = employee.name.split(' ')[0]
     if (employee.checked_in) {
-      setView({ name: 'done', message: `Checked out — see you tomorrow, ${first}` })
+      setView({
+        name: 'done',
+        message: `Checked out — see you tomorrow, ${first}`,
+        note: row.is_half_day ? 'Marked as half day (late check-in or left before closing cutoff)' : undefined,
+      })
     } else {
       setView({
         name: 'done',

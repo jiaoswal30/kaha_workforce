@@ -163,5 +163,7 @@ export interface StoreConfig {
   late_threshold_minutes: number
   require_photo: boolean
   task_comments_enabled: boolean
+  checkout_cutoff: string
+  timezone: string
 }
 

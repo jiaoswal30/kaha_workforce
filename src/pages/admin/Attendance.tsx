@@ -2,9 +2,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { format, startOfMonth, endOfMonth, subMonths, subDays } from 'date-fns'
 import { supabase } from '../../lib/supabaseClient'
 import { formatDate, formatDay, formatTime, hoursWorked } from '../../lib/dates'
+import { punctualityOf, leftEarly, PUNCTUALITY_LABELS } from '../../lib/punctuality'
 import { Card, SectionLabel, Button, StatusBadge, Chip, Input, PageSkeleton, EmptyState } from '../../components/ui'
 import PhotoThumb from '../../components/PhotoThumb'
-import type { Attendance, Employee, LeaveBalance } from '../../types/database'
+import type { Attendance, Employee, LeaveBalance, StoreConfig } from '../../types/database'
+
+const DOT_COLORS = { green: 'bg-sage-500', yellow: 'bg-bronze-500', red: 'bg-brick-500' }
 
 export default function AdminAttendance() {
   const now = new Date()
@@ -13,6 +16,7 @@ export default function AdminAttendance() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [balances, setBalances] = useState<LeaveBalance[]>([])
+  const [config, setConfig] = useState<StoreConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -25,17 +29,19 @@ export default function AdminAttendance() {
       })
     }
     const rangeStartDate = new Date(start + 'T00:00:00')
-    const [{ data: emps }, { data: att }, bal] = await Promise.all([
+    const [{ data: emps }, { data: att }, bal, { data: cfg }] = await Promise.all([
       supabase.from('employees').select('*').eq('role', 'employee').order('name'),
       supabase.from('attendance').select('*').gte('date', start).lte('date', end).order('date', { ascending: false }),
       supabase.rpc('get_all_leave_balances', {
         p_month: rangeStartDate.getMonth() + 1,
         p_year: rangeStartDate.getFullYear(),
       }),
+      supabase.from('store_config').select('*').limit(1).maybeSingle(),
     ])
     setEmployees(emps ?? [])
     setAttendance(att ?? [])
     setBalances((bal.data as LeaveBalance[]) ?? [])
+    setConfig(cfg ?? null)
     setLoading(false)
   }, [start, end])
 
@@ -54,18 +60,27 @@ export default function AdminAttendance() {
   }
 
   function exportCSV() {
-    const header = ['Employee', 'Date', 'Day', 'Check-in', 'Check-out', 'Hours', 'Late', 'Half day', 'Status']
-    const rows = attendance.map((a) => [
-      employeeName(a.employee_id),
-      a.date,
-      formatDay(a.date),
-      a.check_in_time ? formatTime(a.check_in_time) : '',
-      a.check_out_time ? formatTime(a.check_out_time) : '',
-      hoursWorked(a.check_in_time, a.check_out_time),
-      a.is_late ? 'Yes' : 'No',
-      a.is_half_day ? 'Yes' : 'No',
-      a.status ?? '',
-    ])
+    const header = [
+      'Employee', 'Date', 'Day', 'Check-in', 'Check-out', 'Hours',
+      'Punctuality', 'Left early (before cutoff)', 'Late', 'Half day', 'Status',
+    ]
+    const rows = attendance.map((a) => {
+      const p = punctualityOf(a, config)
+      const early = config && a.check_out_time ? leftEarly(a.check_out_time, config) : false
+      return [
+        employeeName(a.employee_id),
+        a.date,
+        formatDay(a.date),
+        a.check_in_time ? formatTime(a.check_in_time) : '',
+        a.check_out_time ? formatTime(a.check_out_time) : '',
+        hoursWorked(a.check_in_time, a.check_out_time),
+        p ? `${PUNCTUALITY_LABELS[p]} (${p})` : '',
+        early ? 'Yes' : 'No',
+        a.is_late ? 'Yes' : 'No',
+        a.is_half_day ? 'Yes' : 'No',
+        a.status ?? '',
+      ]
+    })
     const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -124,6 +139,58 @@ export default function AdminAttendance() {
       </Card>
 
       <Card>
+        <SectionLabel>Punctuality</SectionLabel>
+        <p className="mb-3 text-xs text-ink-soft">
+          Each square is a worked day, colored by check-in time: green = on time, yellow = within{' '}
+          {config?.late_threshold_minutes ?? 10} min of opening, red = later (auto half day). A hollow ring means they
+          left before {config ? formatTime(`2000-01-01T${config.checkout_cutoff}`) : '7:30 PM'}.
+        </p>
+        {employees.map((emp) => {
+          const rows = attendance
+            .filter((a) => a.employee_id === emp.id && a.check_in_time)
+            .sort((a, b) => a.date.localeCompare(b.date))
+          const counts = { green: 0, yellow: 0, red: 0 }
+          rows.forEach((r) => {
+            const p = punctualityOf(r, config)
+            if (p) counts[p]++
+          })
+          return (
+            <div key={emp.id} className="mb-4 last:mb-0">
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-sm font-medium text-ink dark:text-ivory-dark-text">{emp.name}</p>
+                <p className="text-[11px] text-ink-soft">
+                  <span className="text-sage-500">{counts.green} on time</span> ·{' '}
+                  <span className="text-bronze-500">{counts.yellow} late</span> ·{' '}
+                  <span className="text-brick-500">{counts.red} very late</span>
+                </p>
+              </div>
+              {rows.length === 0 ? (
+                <p className="text-xs text-ink-soft">No check-ins in this range.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {rows.map((r) => {
+                    const p = punctualityOf(r, config)!
+                    const early = config && r.check_out_time ? leftEarly(r.check_out_time, config) : false
+                    return (
+                      <span
+                        key={r.id}
+                        title={`${formatDate(r.date)} · in ${formatTime(r.check_in_time)}${r.check_out_time ? ` · out ${formatTime(r.check_out_time)}` : ''}`}
+                        className={`flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-semibold text-white ${DOT_COLORS[p]} ${
+                          early ? 'ring-2 ring-inset ring-white/70' : ''
+                        }`}
+                      >
+                        {Number(r.date.slice(8, 10))}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </Card>
+
+      <Card>
         <SectionLabel>Summary</SectionLabel>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[460px] text-left text-xs">
@@ -157,25 +224,32 @@ export default function AdminAttendance() {
         <SectionLabel>Entries</SectionLabel>
         {attendance.length === 0 && <EmptyState>No entries in this range.</EmptyState>}
         <ul className="divide-y divide-hairline dark:divide-hairline-dark">
-          {attendance.map((a) => (
-            <li key={a.id} className="flex items-center gap-3 py-2.5">
-              <div className="flex gap-1.5">
-                <PhotoThumb photo={a.check_in_photo} label={`${employeeName(a.employee_id)} — in, ${formatDate(a.date)}`} />
-                <PhotoThumb photo={a.check_out_photo} label={`${employeeName(a.employee_id)} — out, ${formatDate(a.date)}`} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-sm font-medium text-ink dark:text-ivory-dark-text">
-                  {employeeName(a.employee_id)}
-                  {a.is_late && <Chip tone="bronze">Late</Chip>}
-                </p>
-                <p className="text-xs text-ink-soft">
-                  {formatDate(a.date)} ({formatDay(a.date)}) · {formatTime(a.check_in_time)} – {formatTime(a.check_out_time)} ·{' '}
-                  {hoursWorked(a.check_in_time, a.check_out_time)}
-                </p>
-              </div>
-              <StatusBadge status={a.status} />
-            </li>
-          ))}
+          {attendance.map((a) => {
+            const p = punctualityOf(a, config)
+            const early = config && a.check_out_time ? leftEarly(a.check_out_time, config) : false
+            return (
+              <li key={a.id} className="flex items-center gap-3 py-2.5">
+                <div className="flex gap-1.5">
+                  <PhotoThumb photo={a.check_in_photo} label={`${employeeName(a.employee_id)} — in, ${formatDate(a.date)}`} />
+                  <PhotoThumb photo={a.check_out_photo} label={`${employeeName(a.employee_id)} — out, ${formatDate(a.date)}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 text-sm font-medium text-ink dark:text-ivory-dark-text">
+                    {p && <span className={`h-2 w-2 shrink-0 rounded-full ${DOT_COLORS[p]}`} title={PUNCTUALITY_LABELS[p]} />}
+                    {employeeName(a.employee_id)}
+                    {p === 'yellow' && <Chip tone="bronze">Late</Chip>}
+                    {p === 'red' && <Chip tone="brick">Very late</Chip>}
+                    {early && <Chip tone="bronze">Left early</Chip>}
+                  </p>
+                  <p className="text-xs text-ink-soft">
+                    {formatDate(a.date)} ({formatDay(a.date)}) · {formatTime(a.check_in_time)} – {formatTime(a.check_out_time)} ·{' '}
+                    {hoursWorked(a.check_in_time, a.check_out_time)}
+                  </p>
+                </div>
+                <StatusBadge status={a.status} />
+              </li>
+            )
+          })}
         </ul>
       </Card>
     </div>
