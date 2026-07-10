@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  Home, CalendarDays, CheckSquare, NotebookPen, MoreHorizontal, Monitor, BellRing,
+  Home, CalendarDays, CheckSquare, NotebookPen, MoreHorizontal, Monitor, BellRing, Package,
   MapPin, Users, Gem, Megaphone, MessageCircleWarning, BarChart3, ClipboardList, LogOut, X,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +17,7 @@ const EMPLOYEE_NAV: NavItem[] = [
 
 const EMPLOYEE_MORE: NavItem[] = [
   { to: '/followups', label: 'Follow-ups', icon: BellRing },
+  { to: '/stock', label: 'Stock tally', icon: Package },
   { to: '/concerns', label: 'Concerns', icon: MessageCircleWarning },
   { to: '/notes', label: 'Inventory notes', icon: Gem },
   { to: '/announcements', label: 'Notices', icon: Megaphone },
@@ -31,6 +32,7 @@ const ADMIN_NAV: NavItem[] = [
 
 const ADMIN_MORE: NavItem[] = [
   { to: '/admin/followups', label: 'Follow-ups', icon: BellRing },
+  { to: '/admin/stock', label: 'Stock tally', icon: Package },
   { to: '/admin/tasks', label: 'Tasks & goals', icon: ClipboardList },
   { to: '/admin/logs', label: 'Daily logs', icon: NotebookPen },
   { to: '/admin/concerns', label: 'Concerns', icon: MessageCircleWarning },

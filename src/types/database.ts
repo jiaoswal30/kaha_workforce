@@ -9,6 +9,43 @@ export type ComplaintCategory = 'workplace' | 'schedule' | 'customer_incident' |
 export type ComplaintStatus = 'open' | 'in_discussion' | 'resolved'
 export type FollowupType = 'order' | 'conversion' | 'query'
 export type FollowupPriority = 'low' | 'medium' | 'high'
+export type StockReasonType = 'sold' | 'memo' | 'owner_taken' | 'new_stock' | 'returned' | 'other'
+export type StockTallyStatus = 'pending_approval' | 'approved' | 'rejected'
+
+export interface StockCategory {
+  id: string
+  name: string
+  is_active: boolean
+  sort: number
+  created_at: string
+}
+
+export interface StockTally {
+  id: string
+  date: string
+  status: StockTallyStatus
+  submitted_by: string
+  approver_id: string | null
+  approver_note: string | null
+  approved_at: string | null
+  created_at: string
+}
+
+export interface StockCount {
+  id: string
+  tally_id: string
+  category_id: string
+  expected: number | null
+  counted: number
+}
+
+export interface StockReason {
+  id: string
+  count_id: string
+  reason: StockReasonType
+  quantity: number
+  note: string | null
+}
 
 export interface Followup {
   id: string

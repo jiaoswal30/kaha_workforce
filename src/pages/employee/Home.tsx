@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { todayISO, formatTime, hoursWorked } from '../../lib/dates'
 import { Card, SectionLabel, Button, Banner, Chip, Input, PageSkeleton } from '../../components/ui'
 import { isDueToday, isOverdue, notifyDueFollowups, sortByUrgency, FOLLOWUP_TYPE_LABELS } from '../../lib/followups'
-import type { Attendance, Followup, LeaveBalance, Todo, WeekdayName } from '../../types/database'
+import type { Attendance, Followup, LeaveBalance, StockTally, Todo, WeekdayName } from '../../types/database'
 
 const WEEKDAY_INDEX: WeekdayName[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
@@ -34,6 +34,7 @@ export default function EmployeeHome() {
   const [balance, setBalance] = useState<LeaveBalance | null>(null)
   const [todos, setTodos] = useState<Todo[]>([])
   const [dueFollowups, setDueFollowups] = useState<Followup[]>([])
+  const [todayStockTally, setTodayStockTally] = useState<StockTally | null>(null)
   const [newTask, setNewTask] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -41,7 +42,7 @@ export default function EmployeeHome() {
   const load = useCallback(async () => {
     if (!employee) return
     await supabase.rpc('carry_over_my_todos')
-    const [{ data: att }, { data: bal }, { data: t }, { data: allAnn }, { data: reads }, { data: fups }] =
+    const [{ data: att }, { data: bal }, { data: t }, { data: allAnn }, { data: reads }, { data: fups }, { data: stock }] =
       await Promise.all([
         supabase.from('attendance').select('*').eq('employee_id', employee.id).eq('date', todayISO()).maybeSingle(),
         supabase.rpc('get_my_leave_balance', {
@@ -52,6 +53,7 @@ export default function EmployeeHome() {
         supabase.from('announcements').select('id'),
         supabase.from('announcement_reads').select('announcement_id').eq('employee_id', employee.id),
         supabase.from('followups').select('*').eq('employee_id', employee.id).eq('status', 'pending'),
+        supabase.from('stock_tallies').select('*').eq('date', todayISO()).maybeSingle(),
       ])
     setAttendance(att ?? null)
     setBalance((bal as LeaveBalance) ?? null)
@@ -61,6 +63,7 @@ export default function EmployeeHome() {
     const due = sortByUrgency((fups ?? []).filter((f: Followup) => isOverdue(f) || isDueToday(f)))
     setDueFollowups(due)
     notifyDueFollowups(fups ?? [])
+    setTodayStockTally(stock ?? null)
     setLoading(false)
   }, [employee])
 
@@ -104,6 +107,12 @@ export default function EmployeeHome() {
           <Banner tone="info">
             {unreadCount} unread notice{unreadCount > 1 ? 's' : ''} — tap to read
           </Banner>
+        </Link>
+      )}
+
+      {todayStockTally?.status === 'pending_approval' && todayStockTally.approver_id === employee?.id && (
+        <Link to="/stock" className="block lg:col-span-2">
+          <Banner tone="warning">You've been picked to verify today's stock tally — tap to review</Banner>
         </Link>
       )}
 
