@@ -3,7 +3,7 @@
 -- complaints channel, GPS removal. Run AFTER 0001_init.sql.
 -- ============================================================================
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ----------------------------------------------------------------------------
 -- 1. SCHEMA CHANGES
@@ -128,9 +128,11 @@ begin
 end;
 $$;
 
+-- search_path includes `extensions` because Supabase installs pgcrypto
+-- (crypt / gen_salt) there, not in public.
 create function set_employee_pin(p_employee_id uuid, p_pin text)
 returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not is_admin() then
     raise exception 'Admin only.';
@@ -206,7 +208,7 @@ $$;
 -- actions for 60 seconds.
 create function verify_pin(p_employee_id uuid, p_pin text)
 returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 declare
   v_hash text;
   v_attempt pin_attempts;
