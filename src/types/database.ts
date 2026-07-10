@@ -161,5 +161,6 @@ export interface StoreConfig {
   sunday_open_time: string
   late_threshold_minutes: number
   require_photo: boolean
+  task_comments_enabled: boolean
 }
 

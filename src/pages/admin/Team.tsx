@@ -7,6 +7,41 @@ import type { Employee, RegisteredDevice, StoreConfig, WeekdayName } from '../..
 const DEVICE_TOKEN_KEY = 'kaha_device_token'
 const WEEKDAYS: WeekdayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+function Toggle({
+  label,
+  hint,
+  checked,
+  onToggle,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-medium text-ink dark:text-ivory-dark-text">{label}</p>
+        <p className="mt-0.5 text-xs text-ink-soft">{hint}</p>
+      </div>
+      <button
+        onClick={onToggle}
+        role="switch"
+        aria-checked={checked}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+          checked ? 'bg-gold-500' : 'bg-hairline dark:bg-hairline-dark'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-[left] ${
+            checked ? 'left-[22px]' : 'left-0.5'
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
+
 export default function AdminTeam() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [devices, setDevices] = useState<RegisteredDevice[]>([])
@@ -74,6 +109,17 @@ export default function AdminTeam() {
     if (error) {
       setError(error.message)
       setConfig({ ...config, require_photo: !next })
+    }
+  }
+
+  async function toggleTaskComments() {
+    if (!config) return
+    const next = !config.task_comments_enabled
+    setConfig({ ...config, task_comments_enabled: next })
+    const { error } = await supabase.from('store_config').update({ task_comments_enabled: next }).eq('id', config.id)
+    if (error) {
+      setError(error.message)
+      setConfig({ ...config, task_comments_enabled: !next })
     }
   }
 
@@ -154,29 +200,21 @@ export default function AdminTeam() {
       </Card>
 
       <Card>
-        <SectionLabel>Kiosk settings</SectionLabel>
+        <SectionLabel>Preferences</SectionLabel>
 
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-ink dark:text-ivory-dark-text">Require photo at check-in</p>
-            <p className="mt-0.5 text-xs text-ink-soft">
-              Turn off if the kiosk computer has no camera — attendance becomes PIN-only. Applies immediately.
-            </p>
-          </div>
-          <button
-            onClick={togglePhoto}
-            role="switch"
-            aria-checked={config?.require_photo ?? false}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-              config?.require_photo ? 'bg-gold-500' : 'bg-hairline dark:bg-hairline-dark'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-[left] ${
-                config?.require_photo ? 'left-[22px]' : 'left-0.5'
-              }`}
-            />
-          </button>
+        <Toggle
+          label="Require photo at check-in"
+          hint="Turn off if the kiosk computer has no camera — attendance becomes PIN-only. Applies immediately."
+          checked={config?.require_photo ?? false}
+          onToggle={togglePhoto}
+        />
+        <div className="mt-4">
+          <Toggle
+            label="Task comments"
+            hint="Off: tasks just get added and ticked off — nothing for you to save or approve. On: you can leave a note on any employee task."
+            checked={config?.task_comments_enabled ?? false}
+            onToggle={toggleTaskComments}
+          />
         </div>
 
         <div className="mt-5 border-t border-hairline pt-4 dark:border-hairline-dark">

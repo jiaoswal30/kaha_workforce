@@ -4,19 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { todayISO, currentWeekStartISO } from '../../lib/dates'
 import { Card, SectionLabel, Button, Input, Chip, EmptyState, PageSkeleton, ProgressRing } from '../../components/ui'
-import type { Todo, WeeklyGoal, TodoStatus } from '../../types/database'
-
-const STATUS_CYCLE: Record<TodoStatus, TodoStatus> = {
-  pending: 'in_progress',
-  in_progress: 'done',
-  done: 'pending',
-}
-
-const STATUS_META: Record<TodoStatus, { label: string; tone: 'neutral' | 'gold' | 'sage' }> = {
-  pending: { label: 'Pending', tone: 'neutral' },
-  in_progress: { label: 'In progress', tone: 'gold' },
-  done: { label: 'Done', tone: 'sage' },
-}
+import type { Todo, WeeklyGoal } from '../../types/database'
 
 export default function EmployeeTasks() {
   const { employee } = useAuth()
@@ -57,11 +45,11 @@ export default function EmployeeTasks() {
     await load()
   }
 
-  async function cycleStatus(todo: Todo) {
-    const next = STATUS_CYCLE[todo.status]
+  async function toggleTodo(todo: Todo) {
+    const done = todo.status !== 'done'
     await supabase
       .from('todos')
-      .update({ status: next, completed_at: next === 'done' ? new Date().toISOString() : null })
+      .update({ status: done ? 'done' : 'pending', completed_at: done ? new Date().toISOString() : null })
       .eq('id', todo.id)
     await load()
   }
@@ -98,21 +86,22 @@ export default function EmployeeTasks() {
           <Input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
           <Button type="submit" className="w-full !py-2 text-xs">Add task</Button>
         </form>
-        <ul className="divide-y divide-hairline dark:divide-hairline-dark">
+        <ul className="space-y-2.5">
           {todos.map((t) => (
-            <li key={t.id} className="py-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className={`text-sm font-medium ${t.status === 'done' ? 'text-ink-soft line-through' : 'text-ink dark:text-ivory-dark-text'}`}>
-                    {t.title}
-                  </p>
-                  {t.carried_from && <Chip tone="neutral">carried over</Chip>}
-                  {t.description && <p className="mt-0.5 text-xs text-ink-soft">{t.description}</p>}
-                  {t.admin_comment && <p className="mt-1 text-xs italic text-gold-600">Admin: {t.admin_comment}</p>}
-                </div>
-                <button onClick={() => cycleStatus(t)} className="shrink-0">
-                  <Chip tone={STATUS_META[t.status].tone}>{STATUS_META[t.status].label}</Chip>
-                </button>
+            <li key={t.id} className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={t.status === 'done'}
+                onChange={() => toggleTodo(t)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-gold-500"
+              />
+              <div className="min-w-0">
+                <p className={`text-sm ${t.status === 'done' ? 'text-ink-soft line-through' : 'text-ink dark:text-ivory-dark-text'}`}>
+                  {t.title}
+                  {t.carried_from && <span className="ml-2 inline-block align-middle"><Chip tone="neutral">carried</Chip></span>}
+                </p>
+                {t.description && <p className="mt-0.5 text-xs text-ink-soft">{t.description}</p>}
+                {t.admin_comment && <p className="mt-0.5 text-xs italic text-gold-600">Admin: {t.admin_comment}</p>}
               </div>
             </li>
           ))}
