@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { todayISO, formatTime, hoursWorked } from '../../lib/dates'
 import { Card, SectionLabel, Button, Banner, Chip, Input, PageSkeleton } from '../../components/ui'
+import InstallPrompt from '../../components/InstallPrompt'
 import { isDueToday, isOverdue, notifyDueFollowups, sortByUrgency, FOLLOWUP_TYPE_LABELS } from '../../lib/followups'
 import type { Attendance, Followup, LeaveBalance, StockTally, Todo, WeekdayName } from '../../types/database'
 
@@ -101,6 +102,8 @@ export default function EmployeeHome() {
         </h1>
         <p className="mt-0.5 text-sm text-ink-soft">{format(new Date(), 'EEEE, d MMMM')}</p>
       </div>
+
+      <InstallPrompt />
 
       {unreadCount > 0 && (
         <Link to="/announcements" className="block lg:col-span-2">

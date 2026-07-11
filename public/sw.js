@@ -3,6 +3,15 @@
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
 
+// Minimal fetch handler: network passthrough. Present so browsers treat the
+// site as an installable app; no caching (Vite's hashed assets + a live
+// Supabase backend make stale caches worse than none).
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request))
+  }
+})
+
 self.addEventListener('push', (event) => {
   let payload = { title: 'Kaha ✦', body: 'You have an update.', url: '/followups' }
   try {
